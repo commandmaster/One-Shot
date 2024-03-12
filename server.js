@@ -25,19 +25,45 @@ class NetworkManager {
 
     onDisconnection(socket) {
         console.log('disconnection', socket.id)
+        this.serverScene.physics.destroy(this.players[socket.id].rb)
+        io.emit('deleteEntity', {id: socket.id})
         delete this.players[socket.id]
     }
 
 }
+
+class StatePacket{
+    constructor(pos, rot, linearVel, angularVel, frameID){
+      this.pos = {x: pos.x, y: pos.y, z: pos.z};
+      this.rot = {x: rot.x, y: rot.y, z: rot.z, w: rot.w};
+  
+  
+      this.linearVel = {x: linearVel.x, y: linearVel.y, z: linearVel.z};
+  
+      this.angularVel = {x: angularVel.x, y: angularVel.y, z: angularVel.z, w: angularVel.w};
+  
+      this.frameID = frameID;
+    }
+  }
+
+class EntitiesPacket{
+    constructor(players){
+        this.entities = {}
+        for (const id in players){
+            this.entities[id] = {pos: {x: players[id].rb.position.x, y: players[id].rb.position.y, z: players[id].rb.position.z}, rot: {x: players[id].rb.rotation.x, y: players[id].rb.rotation.y, z: players[id].rb.rotation.z, w: players[id].rb.rotation.w}}
+        }
+    }
+}
+
 
 class BackendPlayer {
     constructor(networkManager, socket, scene) {
         this.networkManager = networkManager;
         this.socket = socket
         this.scene = scene
-        this.queuedInputs = {}
+        this.queuedPacket = {}
 
-        this.socket.on('cientPacket', (packet) => {
+        this.socket.on('clientPacket', (packet) => {
           const inputs = packet.inputs;
           const frameID = packet.frameID;
           const socketID = this.socket.id;
@@ -50,28 +76,34 @@ class BackendPlayer {
     init() {
         this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
         this.scene.objects.push(this.rb)
+
+        this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}})
     }
 
     applyMovements(){
       for (const input in this.queuedPacket.inputs){
-
+        const speed = 2;
+        if (input === 'up' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.applyForce(0, 0, -speed)
+        }
+        if (input === 'down' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.applyForce(0, 0, speed)
+        }
+        if (input === 'left' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.applyForce(-speed, 0, 0)
+        }
+        if (input === 'right' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.applyForce(speed, 0, 0)
+        }
       }
     }
 
-    sendState(statePacket){
-      socketToResolve.emit('reolvedState', statePacket)
+    sendState(socketToResolve, statePacket){
+      socketToResolve.emit('resolveState', statePacket)
     }
 }
 
-class StatePacket{
-  constructor(pos, rot, linearVel, angularVel, frameID){
-    this.pos = pos;
-    this.rot = rot;
-    this.linerVel = linearVel;
-    this.angularVel = angularVel;
-    this.frameID = frameID;
-  }
-}
+
 
 class ServerScene {
   constructor(networkManager) {
@@ -113,8 +145,6 @@ class ServerScene {
     if (process.env.NODE_ENV !== 'production') clock.disableHighAccuracy()
 
     clock.onTick(delta => this.update(delta))
-
-
   }
 
   update(delta) {
@@ -126,9 +156,16 @@ class ServerScene {
     this.physics.update(delta * 1000)
 
     for (const playerID in players){
-      players[playerID].applyMovements();
+        if (players[playerID].queuedPacket.frameID ){
+            const statePacketToSend = new StatePacket(players[playerID].rb.position, players[playerID].rb.rotation, players[playerID].rb.body.velocity, players[playerID].rb.body.angularVelocity, players[playerID].queuedPacket.frameID)
+            const socketToResolve = players[playerID].socket;
+            players[playerID].sendState(socketToResolve, statePacketToSend);
+            this.queuedPacket = {}
+        }
     }
 
+
+    io.emit('updateEntities', new EntitiesPacket(players))
 
     // TODO
     // send new positions to the client
@@ -139,6 +176,7 @@ class ServerScene {
 
 
 // wait for Ammo to be loaded
+
 _ammo().then(ammo => {
     globalThis.Ammo = ammo
 
