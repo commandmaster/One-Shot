@@ -15,25 +15,34 @@ class NetworkManager {
     constructor() {
         // start server scene
         this.serverScene = new ServerScene(this)
-
         this.players = {}
     }
 
     onConnection(socket) {
         console.log('new connection', socket.id)
-        this.players[socket.id] = new BackendPlayer(socket, this.serverScene)                                                           
+        this.players[socket.id] = new BackendPlayer(this, socket, this.serverScene)                                                           
     }
 
     onDisconnection(socket) {
         console.log('disconnection', socket.id)
         delete this.players[socket.id]
     }
+
 }
 
 class BackendPlayer {
-    constructor(socket, scene) {
+    constructor(networkManager, socket, scene) {
+        this.networkManager = networkManager;
         this.socket = socket
         this.scene = scene
+        this.queuedInputs = {}
+
+        this.socket.on('cientPacket', (packet) => {
+          const inputs = packet.inputs;
+          const frameID = packet.frameID;
+          const socketID = this.socket.id;
+          this.queuedPacket = {inputs, frameID, socketID};
+        });
 
         this.init()
     }
@@ -41,6 +50,16 @@ class BackendPlayer {
     init() {
         this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
         this.scene.objects.push(this.rb)
+    }
+
+    applyMovements(){
+      for (const input in this.queuedPacket.inputs){
+
+      }
+    }
+
+    sendState(statePacket){
+      socketToResolve.emit('reolvedState', statePacket)
     }
 }
 
@@ -86,9 +105,16 @@ class ServerScene {
     if (process.env.NODE_ENV !== 'production') clock.disableHighAccuracy()
 
     clock.onTick(delta => this.update(delta))
+
+
   }
 
   update(delta) {
+    const players = this.networkManager.players
+    for (const playerID in players){
+      players[playerID].applyMovements();
+    }
+
     this.physics.update(delta * 1000)
 
     for (const playerId in this.networkManager.players) {
@@ -104,6 +130,10 @@ class ServerScene {
 
     // TODO
     // send new positions to the client
+  }
+
+  applyMovements(inputs){
+
   }
 }
 
