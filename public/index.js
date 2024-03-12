@@ -5,6 +5,7 @@ class MainScene extends Scene3D {
         super('MainScene')
     }
 
+    
     init() {
         console.log('init')
 
