@@ -13,22 +13,43 @@ const io = socket(server)
 
 class NetworkManager {
     constructor() {
-        
+        // start server scene
+        this.serverScene = new ServerScene(this)
+
+        this.players = {}
     }
 
     onConnection(socket) {
         console.log('new connection', socket.id)
+        this.players[socket.id] = new BackendPlayer(socket, this.serverScene)                                                           
     }
 
     onDisconnection(socket) {
-        console.log('disconnected', socket.id)
+        console.log('disconnection', socket.id)
+        delete this.players[socket.id]
+    }
+}
+
+class BackendPlayer {
+    constructor(socket, scene) {
+        this.socket = socket
+        this.scene = scene
+
+        this.init()
+    }
+
+    init() {
+        this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
+        this.scene.objects.push(this.rb)
     }
 }
 
 
 
 class ServerScene {
-  constructor() {
+  constructor(networkManager) {
+    this.networkManager = networkManager
+
     this.init()
     this.create()
   }
@@ -51,24 +72,11 @@ class ServerScene {
       mass: 0
     })
 
-    const box = this.physics.add.box({ name: 'box', y: 5 })
+    ground.position.set(0, 0, 0)
 
-    /**
-     * "this.physics.add.box({ name: 'box', y: 5 })"
-     * is exactly the same as you would do:
-     *
-     * const geometry = new THREE.BoxGeometry()
-     * const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 })
-     * const box = new THREE.Mesh(geometry, material)
-     * box.name = 'box' // give it a name
-     * box.position.set(0, 5, 0) // set y to 5
-     * this.physics.add.existing(box) // add physics to the box
-     *
-     * of course you would have to include three first
-     * const THREE = require('three')
-     */
 
-    this.objects = [ground, box]
+
+    this.objects = [ground]
 
     // clock
     const clock = new ServerClock()
@@ -83,31 +91,39 @@ class ServerScene {
   update(delta) {
     this.physics.update(delta * 1000)
 
-    const box = this.objects[1]
-    const y = box.position.y.toFixed(2)
+    for (const playerId in this.networkManager.players) {
+        
+        const player = this.networkManager.players[playerId]
+        const physBody = player.rb
 
-    // will print the y position of the box from 5.00 to 1.00
-    if (y > 1) console.log('y:', y)
+        this.networkManager.players[playerId].socket.emit('setPos', {
+            pos: { x: physBody.position.x.toFixed(2), y:physBody.position.y.toFixed(2), z:physBody.position.z.toFixed(2)}
+            
+        })         
+    }
 
     // TODO
     // send new positions to the client
   }
 }
 
+
+
 // wait for Ammo to be loaded
 _ammo().then(ammo => {
-  globalThis.Ammo = ammo
+    globalThis.Ammo = ammo
 
-  // start server scene
-  new ServerScene()
+    
+    let networkManager = new NetworkManager()
+
+    io.on('connection', socket => {
+        networkManager.onConnection(socket)
+    
+        socket.on('disconnect', () => networkManager.onDisconnection(socket))
+    });
 })
 
-let networkManager = new NetworkManager()
-io.on('connection', socket => {
-    networkManager.onConnection(socket)
 
-    socket.on('disconnect', () => networkManager.onDisconnection(socket))
-});
 
 
 
