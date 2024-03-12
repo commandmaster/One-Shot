@@ -63,7 +63,15 @@ class BackendPlayer {
     }
 }
 
-
+class StatePacket{
+  constructor(pos, rot, linearVel, angularVel, frameID){
+    this.pos = pos;
+    this.rot = rot;
+    this.linerVel = linearVel;
+    this.angularVel = angularVel;
+    this.frameID = frameID;
+  }
+}
 
 class ServerScene {
   constructor(networkManager) {
@@ -117,24 +125,15 @@ class ServerScene {
 
     this.physics.update(delta * 1000)
 
-    for (const playerId in this.networkManager.players) {
-        
-        const player = this.networkManager.players[playerId]
-        const physBody = player.rb
-
-        this.networkManager.players[playerId].socket.emit('setPos', {
-            pos: { x: physBody.position.x.toFixed(2), y:physBody.position.y.toFixed(2), z:physBody.position.z.toFixed(2)}
-            
-        })         
+    for (const playerID in players){
+      players[playerID].applyMovements();
     }
+
 
     // TODO
     // send new positions to the client
   }
 
-  applyMovements(inputs){
-
-  }
 }
 
 
