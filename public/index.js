@@ -117,7 +117,7 @@ class MainScene extends Scene3D {
         resize()
 
         // enable physics debug
-        this.physics.debug.enable()
+        //this.physics.debug.enable()
 
         // position camera
         this.camera.position.set(10, 10, 20)
@@ -196,7 +196,7 @@ class PlayerClient{
         this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
         this.rb.material.castShadow = true
         console.log(this.rb)
-        this.rb.visible = false;
+        //this.rb.visible = false;
 
         this.rb.body.setCollisionFlags(2)
         this.rb.body.setRotation(initPacket.rot.x, initPacket.rot.y, initPacket.rot.z)
@@ -221,7 +221,7 @@ class PlayerClient{
             })
         })
 
-        this.animator = new Animator(['idle'], ['/gameAssets/RifleIdle.glb'], this.scene)
+        this.animator = new Animator(['idle'], ['/gameAssets/Rifle_Idle.glb'], this.scene)
         this.animator.play('idle')
     }
 
@@ -313,6 +313,7 @@ class Animator{
             tempModel.animation.add('idle', gltf.animations[0])
 
             tempModel.scale.set(1.5, 1.5, 1.5)
+
 
             this.model = tempModel;
 
