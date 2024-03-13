@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import { OrbitControls } from '/jsm/controls/OrbitControls.js'
 //import { FBXLoader } from './jsm/loaders/FBXLoader.js'
 
+
+
 class MainScene extends Scene3D {
     constructor() {
         super('MainScene')
@@ -160,9 +162,9 @@ class MainScene extends Scene3D {
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
 
-            if (this.playerModel){
-                this.playerModel.position.set(this.player.rb.position.x, this.player.rb.position.y, this.player.rb.position.z)
-                this.playerModel.rotation.set(this.player.rb.rotation.x, this.player.rb.rotation.y, this.player.rb.rotation.z, this.player.rb.rotation.w)
+            if (this.player.playerModel){
+                this.player.playerModel.position.set(this.player.rb.position.x, this.player.rb.position.y, this.player.rb.position.z)
+                this.player.playerModel.rotation.set(this.player.rb.rotation.x, this.player.rb.rotation.y, this.player.rb.rotation.z, this.player.rb.rotation.w)
             
             }
         }
@@ -221,8 +223,14 @@ class PlayerClient{
             })
         })
 
-        this.animator = new Animator(['idle'], ['/gameAssets/Rifle_Idle.glb'], this.scene)
-        this.animator.play('idle')
+        this.animator = new Animator('/gameAssets/PlayerWithAnims.glb', this.scene)
+        this.animator.loadAnimations().then(animNames => {
+            this.animator.play(animNames[3])
+            this.playerModel = this.animator.model;
+        });
+
+
+
     }
 
     applyMovements(inputs){
@@ -277,54 +285,83 @@ class OtherEntity{
 
 
 class Animator{
-    constructor(animNames, animPaths, scene){
+    constructor(objectPath, scene){
         this.scene = scene;
-        this.animNames = animNames;
-        this.animPaths = animPaths;
-        this.loadAnimations();
+        this.objectPath = objectPath;
 
         this.currentAnim = null;
         this.model = null
-
     }
 
     loadAnimations(){
-        this.animations = {};
-        this.scene.load.gltf('/gameAssets/RifleIdle.glb').then(gltf => {
-            const child = gltf.scene.children[0]
+        return new Promise((resolve, reject) => {
+            this.animations = {};
+            this.scene.load.gltf(this.objectPath).then(gltf => {
+                const child = gltf.scene.children[0]
 
 
-            const tempModel = new ExtendedObject3D()
-            tempModel.add(child)
-            this.scene.scene.add(tempModel)
+                const tempModel = new ExtendedObject3D()
+                tempModel.add(child)
+                this.scene.scene.add(tempModel)
 
 
 
-            tempModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true
-                    child.material.metalness = 0
-                }
+                tempModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true
+                        child.material.metalness = 0
+                    }
 
-                
+
+                });
+
+                this.scene.animationMixers.add(tempModel.animation.mixer)
+
+                const animNames = [];
+                gltf.animations.forEach(animation => {
+                    if (animation.name) {
+                      // add a new animation to the box man
+                      tempModel.animation.add(animation.name, animation)
+                      animNames.push(animation.name)
+                    }
+                })
+
+                tempModel.animation.mixer.timeScale = 0.1
+
+
+                tempModel.scale.set(1.5, 1.5, 1.5)
+
+
+                this.model = tempModel;
+
+
+                tempModel.animation.play(animNames[0])
+
+                resolve(animNames);
+            }).catch(error => {
+                reject(error);
             });
-
-            this.scene.animationMixers.add(tempModel.animation.mixer)
-            tempModel.animation.add('idle', gltf.animations[0])
-
-            tempModel.scale.set(1.5, 1.5, 1.5)
-
-
-            this.model = tempModel;
-
-
-            tempModel.animation.play('idle')
-          });
+        });
     }
 
     play(name){
-        // this.animations[name].play()
-        // this.currentAnim = name;
+        this.model.animation.play(name)
     }
+
+}
+
+class PlayerStateMachine{
+    constructor(player){
+        this.player = player;
+
+        this.animator = player.animator;
+        this.currentState = null;
+    }
+
+    update(){
+        console.log(this.player.rb.velocity)
+    }
+
+
 }
 
