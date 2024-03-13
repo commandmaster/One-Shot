@@ -14,9 +14,13 @@ const server = app.listen(3000)
 const socket = require('socket.io')
 const io = socket(server)
 
+
+
+
 class NetworkManager {
     constructor() {
         // start server scene
+
         this.serverScene = new ServerScene(this)
         this.players = {}
     }
@@ -78,6 +82,7 @@ class BackendPlayer {
 
     init() {
         this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
+        this.rb.body.setFriction(1.2)
         this.scene.objects.push(this.rb)
 
         this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}})
@@ -85,17 +90,26 @@ class BackendPlayer {
 
     applyMovements(){
       for (const input in this.queuedPacket.inputs){
-        const speed = 2;
-        if (input === 'up' && this.queuedPacket.inputs[input] === true){
+        let speed = 1.5;
+        const maxSpeed = 5;
+        const turnMultiplier = 2.5;
+
+        const vel = this.rb.body.velocity;
+
+        if (input === 'up' && this.queuedPacket.inputs[input] === true && vel.z > -maxSpeed){
+          if (vel.z > 0) speed *= turnMultiplier;
           this.rb.body.applyForce(0, 0, -speed)
         }
-        if (input === 'down' && this.queuedPacket.inputs[input] === true){
+        if (input === 'down' && this.queuedPacket.inputs[input] === true && vel.z < maxSpeed){
+          if (vel.z < 0) speed *= turnMultiplier;
           this.rb.body.applyForce(0, 0, speed)
         }
-        if (input === 'left' && this.queuedPacket.inputs[input] === true){
+        if (input === 'left' && this.queuedPacket.inputs[input] === true && vel.x > -maxSpeed){
+          if (vel.x > 0) speed *= turnMultiplier;
           this.rb.body.applyForce(-speed, 0, 0)
         }
-        if (input === 'right' && this.queuedPacket.inputs[input] === true){
+        if (input === 'right' && this.queuedPacket.inputs[input] === true && vel.x < maxSpeed){
+          if (vel.x < 0) speed *= turnMultiplier;
           this.rb.body.applyForce(speed, 0, 0)
         }
       }

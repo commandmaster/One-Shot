@@ -21,6 +21,11 @@ class MainScene extends Scene3D {
         let socket = io.connect('http://localhost:3000')
         this.socket = socket;
 
+        this.socket.on('reloadTab', () => {
+            console.log('reloadTab')
+            location.reload()
+        });
+
         this.socket.on('createPlayer', (packet) => {
             this.player = new PlayerClient(this.socket, this, packet)
         });
@@ -104,7 +109,7 @@ class MainScene extends Scene3D {
         dirLight.castShadow = true;
         this.scene.add( dirLight );
 
-        this.warpSpeed('-ground-light')
+        this.warpSpeed('camera', 'lookAtCenter', 'orbitControls', 'sky', 'fog')
 
         const resize = () => {
             const newWidth = window.innerWidth
@@ -119,7 +124,7 @@ class MainScene extends Scene3D {
         resize()
 
         // enable physics debug
-        //this.physics.debug.enable()
+        this.physics.debug.enable()
 
         // position camera
         this.camera.position.set(10, 10, 20)
@@ -162,11 +167,7 @@ class MainScene extends Scene3D {
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
 
-            if (this.player.playerModel){
-                this.player.playerModel.position.set(this.player.rb.position.x, this.player.rb.position.y, this.player.rb.position.z)
-                this.player.playerModel.rotation.set(this.player.rb.rotation.x, this.player.rb.rotation.y, this.player.rb.rotation.z, this.player.rb.rotation.w)
-            
-            }
+            this.player.update()
         }
 
         
@@ -196,9 +197,10 @@ class PlayerClient{
 
     init(initPacket){
         this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
+        this.rb.body.setFriction(1.2)
         this.rb.material.castShadow = true
-        console.log(this.rb)
-        //this.rb.visible = false;
+        //console.log(this.rb)
+        this.rb.visible = false;
 
         this.rb.body.setCollisionFlags(2)
         this.rb.body.setRotation(initPacket.rot.x, initPacket.rot.y, initPacket.rot.z)
@@ -234,24 +236,40 @@ class PlayerClient{
     }
 
     applyMovements(inputs){
-        const speed = 2;
-        if (inputs.up === true){
-            this.rb.body.applyForce(0, 0, -speed)
+        let speed = 1.5;
+        const maxSpeed = 5;
+        const turnMultiplier = 2.5;
+
+        const vel = this.rb.body.velocity
+        
+        if (inputs.up === true && vel.z > -maxSpeed){
+            if (vel.z > 0) speed *= turnMultiplier;
+
+            this.rb.body.applyForce(0, 0, -speed);
         }
-        if (inputs.down === true){
-            this.rb.body.applyForce(0, 0, speed)
+        if (inputs.down === true && vel.z < maxSpeed){
+            if (vel.z < 0) speed *= turnMultiplier;
+
+            this.rb.body.applyForce(0, 0, speed);
         }
-        if (inputs.left === true){
-            this.rb.body.applyForce(-speed, 0, 0)
+        if (inputs.left === true && vel.x > -maxSpeed){
+            if (vel.x > 0) speed *= turnMultiplier;
+
+            this.rb.body.applyForce(-speed, 0, 0);
         }
-        if (inputs.right === true){
-            this.rb.body.applyForce(speed, 0, 0)
+        if (inputs.right === true && vel.x < maxSpeed){
+            if (vel.x < 0) speed *= turnMultiplier;
+
+            this.rb.body.applyForce(speed, 0, 0);
         }
         
     }
 
     update(){
-        
+        if (this.playerModel){
+            this.playerModel.position.set(this.rb.position.x, this.rb.position.y - 0.5, this.rb.position.z)
+            this.playerModel.rotation.set(this.rb.rotation.x, this.rb.rotation.y - Math.PI, this.rb.rotation.z, this.rb.rotation.w)
+        }
     }
 }
 
