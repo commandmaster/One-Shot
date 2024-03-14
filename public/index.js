@@ -124,19 +124,11 @@ class MainScene extends Scene3D {
         resize()
 
         // enable physics debug
-        this.physics.debug.enable()
+        //this.physics.debug.enable()
 
         // position camera
         this.camera.position.set(10, 10, 20)
 
-        // const ground = this.physics.add.box({
-        //     name: 'ground',
-        //     width: 40,
-        //     depth: 40,
-        //     collisionFlags: 2,
-        //     mass: 0
-        //   }, new THREE.MeshStandardMaterial({ color: 0x00ff00}))
-        
         const groundGeometry = new THREE.BoxGeometry(40, 1, 40)
         const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff })
         const ground = new THREE.Mesh(groundGeometry, groundMaterial)
@@ -149,14 +141,7 @@ class MainScene extends Scene3D {
         
         
 
-        // // green sphere
-        // const geometry = new THREE.SphereGeometry(0.8, 16, 16)
-        // const material = new THREE.MeshLambertMaterial({ color: 0x00ff00 })
-        // const cube = new THREE.Mesh(geometry, material)
-        // cube.position.set(0.2, 3, 0)
-        // this.scene.add(cube)
-        // // add physics to an existing object
-        // this.physics.add.existing(cube)
+        
     }
 
     update() {
@@ -196,15 +181,31 @@ class PlayerClient{
     }
 
     init(initPacket){
-        this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
+        
+        let group = new THREE.Group()
+        const body = this.scene.add.box({ height: 2.3, width: 0.75, depth: 0.5 })
+        const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
+        group.add(body, head)
+        group.position.set(initPacket.pos.x, initPacket.pos.y, initPacket.pos.z)
+
+        this.scene.physics.add.existing(group)
+        this.rb = group;
+        
+       
+        //this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
+
+
+
         this.rb.body.setFriction(1.2)
-        this.rb.material.castShadow = true
+
         //console.log(this.rb)
         this.rb.visible = false;
 
         this.rb.body.setCollisionFlags(2)
         this.rb.body.setRotation(initPacket.rot.x, initPacket.rot.y, initPacket.rot.z)
         this.rb.body.needUpdate = true;
+
+        console.log(this.rb.body.ammo.getWorldTransform().getOrigin().x(), this.rb.body.ammo.getWorldTransform().getOrigin().y(), this.rb.body.ammo.getWorldTransform().getOrigin().z())
 
 
     
@@ -267,8 +268,12 @@ class PlayerClient{
 
     update(){
         if (this.playerModel){
-            this.playerModel.position.set(this.rb.position.x, this.rb.position.y - 0.5, this.rb.position.z)
-            this.playerModel.rotation.set(this.rb.rotation.x, this.rb.rotation.y - Math.PI, this.rb.rotation.z, this.rb.rotation.w)
+            const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
+            const animRotOffset = {x: 0, y: Math.PI, z: 0}
+
+
+            this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
+            this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
         }
     }
 }
@@ -278,7 +283,16 @@ class OtherEntity{
         this.scene = scene;
         this.init()
 
-        this.rb = this.scene.physics.add.box({ x: entityObject.pos.x, y: entityObject.pos.y, z: entityObject.pos.z }, { lambert: { color: 'hotpink' }});
+
+        let group = new THREE.Group()
+        const body = this.scene.add.box({ height: 2.3, width: 0.75, depth: 0.5 })
+        const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
+        group.add(body, head)
+        group.position.set(entityObject.pos.x, entityObject.pos.y, entityObject.pos.z)
+
+        this.scene.physics.add.existing(group)
+
+        this.rb = group;
         this.rb.body.setCollisionFlags(2)
         this.rb.rotation.set(entityObject.rot.x, entityObject.rot.y, entityObject.rot.z)
         this.rb.body.needUpdate = true;
@@ -286,10 +300,16 @@ class OtherEntity{
         this.rb.body.once.update(() => {
             this.rb.body.setCollisionFlags(0)
         })
+
+        
     }
 
     init(){
-
+        this.animator = new Animator('/gameAssets/PlayerWithAnims.glb', this.scene)
+        this.animator.loadAnimations().then(animNames => {
+            this.animator.play(animNames[3])
+            this.playerModel = this.animator.model;
+        });
     }
 
     update(entityObject){
@@ -297,6 +317,14 @@ class OtherEntity{
         this.rb.position.set(entityObject.pos.x, entityObject.pos.y, entityObject.pos.z)
         this.rb.rotation.set(entityObject.rot.x, entityObject.rot.y, entityObject.rot.z)
         this.rb.body.needUpdate = true;
+
+        const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
+        const animRotOffset = {x: 0, y: Math.PI, z: 0}
+
+        if (this.playerModel){
+            this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
+            this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
+        }
     }
 }
 

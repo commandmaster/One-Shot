@@ -1,5 +1,5 @@
 var _ammo = require('@enable3d/ammo-on-nodejs/ammo/ammo.js')
-const { Physics, ServerClock } = require('@enable3d/ammo-on-nodejs')
+const { Physics, ServerClock, ExtendedObject3D } = require('@enable3d/ammo-on-nodejs')
 
 const express = require('express')
 const app = express()
@@ -14,7 +14,8 @@ const server = app.listen(3000)
 const socket = require('socket.io')
 const io = socket(server)
 
-
+io.eio.pingTimeout = 1000;
+io.eio.pingInterval = 2000;
 
 
 class NetworkManager {
@@ -81,7 +82,23 @@ class BackendPlayer {
     }
 
     init() {
-        this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
+        const tempObj = new ExtendedObject3D()
+
+        const body = this.scene.factory.add.box({ height: 2.3, width: 0.75, depth: 0.5 }, { lambert: { color: 0xffff00 } })
+        const head = this.scene.factory.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 }, { lambert: { color: 0xffff00 } })
+
+        tempObj.add(body, head)
+        tempObj.position.set(0, 20, 0)
+
+
+        this.scene.factory.add.existing(tempObj)
+        this.scene.physics.add.existing(tempObj)
+        this.scene.objects.push(tempObj)
+
+        //this.rb = this.scene.physics.add.box({ y: 20}, { lambert: { color: 'hotpink' }})
+
+        this.rb = tempObj
+
         this.rb.body.setFriction(1.2)
         this.scene.objects.push(this.rb)
 
@@ -165,21 +182,30 @@ class ServerScene {
   }
 
   update(delta) {
+
     const players = this.networkManager.players
     for (const playerID in players){
       players[playerID].applyMovements();
+      
+      players[playerID].rb.body.transform()
+      players[playerID].rb.body.ammo.setAngularFactor(new Ammo.btVector3(0, 0, 0))
+
     }
 
     this.physics.update(delta * 1000)
 
+
+
     for (const playerID in players){
         if (players[playerID].queuedPacket.frameID ){
+            players[playerID].rb.body.transform()
             const statePacketToSend = new StatePacket(players[playerID].rb.position, players[playerID].rb.rotation, players[playerID].rb.body.velocity, players[playerID].rb.body.angularVelocity, players[playerID].queuedPacket.frameID)
             const socketToResolve = players[playerID].socket;
             players[playerID].sendState(socketToResolve, statePacketToSend);
             this.queuedPacket = {}
         }
     }
+
 
 
     io.emit('updateEntities', new EntitiesPacket(players))
