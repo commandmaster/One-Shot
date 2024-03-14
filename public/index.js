@@ -2,9 +2,19 @@ const { Project, Scene3D, AmmoPhysics, PhysicsLoader, ExtendedObject3D} = ENABLE
 
 import * as THREE from 'three'
 import { OrbitControls } from '/jsm/controls/OrbitControls.js'
+import { clone } from '/jsm/utils/SkeletonUtils.js';
 //import { FBXLoader } from './jsm/loaders/FBXLoader.js'
 
-
+function waitForCondition(condition) {
+    return new Promise((resolve) => {
+      const intervalId = setInterval(() => {
+        if (condition()) {
+          clearInterval(intervalId);
+          resolve();
+        }
+      }, 100);
+    });
+  }
 
 class MainScene extends Scene3D {
     constructor() {
@@ -49,6 +59,7 @@ class MainScene extends Scene3D {
                     if (!packet.entities[id]){
                         this.physics.destroy(this.entities[id].rb)
                         this.scene.remove(this.entities[id].rb)
+                        this.scene.remove(this.entities[id].playerModel)
                         delete this.entities[id]
                     }
                 }
@@ -58,6 +69,7 @@ class MainScene extends Scene3D {
         this.socket.on("deleteEntity", (packet) => {
             this.physics.destroy(this.entities[packet.id].rb)
             this.scene.remove(this.entities[packet.id].rb)
+            this.scene.remove(this.entities[packet.id].playerModel)
             delete this.entities[packet.id]
         })
         
@@ -104,12 +116,14 @@ class MainScene extends Scene3D {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
 
 
+
         var dirLight = new THREE.DirectionalLight( 0xffffff );
         dirLight.position.set( 75, 300, -75 );
         dirLight.castShadow = true;
         this.scene.add( dirLight );
 
-        this.warpSpeed('camera', 'lookAtCenter', 'orbitControls', 'sky', 'fog')
+        this.warpSpeed('orbitControls', 'sky', 'fog', 'lookAtCenter', 'camera')
+
 
         const resize = () => {
             const newWidth = window.innerWidth
@@ -138,7 +152,9 @@ class MainScene extends Scene3D {
         this.physics.add.existing(ground, { mass: 0, collisionFlags: 2 })
         ground.position.set(0, 0, 0)
 
-        
+        this.loadAnimatedGLTF('/gameAssets/PlayerWithAnims.glb').then((model) => {
+            this.playerModel = model;
+        });
         
 
         
@@ -158,6 +174,64 @@ class MainScene extends Scene3D {
         
     }
 
+    loadAnimatedGLTF(path){
+        return new Promise((resolve, reject) => {
+            this.animations = {};
+            try {
+
+            }
+
+            catch (error){
+                console.log(error)
+            }
+
+            this.load.gltf(path).then(gltf => {
+                const child = gltf.scene.children[0]
+                
+
+
+                const tempModel = new ExtendedObject3D()
+                tempModel.add(child)
+                
+
+
+
+                tempModel.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true
+                        child.material.metalness = 0
+                    }
+
+
+                });
+
+                this.animationMixers.add(tempModel.animation.mixer)
+
+                const animNames = [];
+                gltf.animations.forEach(animation => {
+                    if (animation.name) {
+                      // add a new animation to the box man
+                      tempModel.animation.add(animation.name, animation)
+                      
+                    }
+                })
+
+                tempModel.animation.mixer.timeScale = 1
+
+
+                tempModel.scale.set(1.5, 1.5, 1.5)
+
+
+                tempModel.animation.play('Idle')
+                
+                
+
+                resolve(tempModel);
+            }).catch(error => {
+                reject(error);
+            });
+        });
+    }
 }
 
 // load from '/lib/ammo/kripken' or '/lib/ammo/moz'
@@ -176,6 +250,7 @@ class PlayerClient{
         this.socket = socket;
         this.scene = scene;
         this.id = initPacket.id;
+        
 
         this.init(initPacket);
     }
@@ -226,14 +301,12 @@ class PlayerClient{
             })
         })
 
-        this.animator = new Animator('/gameAssets/PlayerWithAnims.glb', this.scene)
-        this.animator.loadAnimations().then(animNames => {
-            this.animator.play(animNames[3])
-            this.playerModel = this.animator.model;
+        waitForCondition(() => {return this.scene.playerModel}).then(() => {
+            if (!this.animator){
+                this.animator = new Animator(this.scene.playerModel, this.scene);
+                this.playerModel = this.animator.model;
+            }
         });
-
-
-
     }
 
     applyMovements(inputs){
@@ -270,7 +343,7 @@ class PlayerClient{
         if (this.playerModel){
             const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
             const animRotOffset = {x: 0, y: Math.PI, z: 0}
-
+            //this.scene.camera.position.set(this.rb.position.x, this.rb.position.y + 2, this.rb.position.z)
 
             this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
             this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
@@ -305,10 +378,12 @@ class OtherEntity{
     }
 
     init(){
-        this.animator = new Animator('/gameAssets/PlayerWithAnims.glb', this.scene)
-        this.animator.loadAnimations().then(animNames => {
-            this.animator.play(animNames[3])
-            this.playerModel = this.animator.model;
+        waitForCondition(() => {return this.scene.playerModel}).then(() => {
+            if (!this.animator){
+                this.animator = new Animator(this.scene.playerModel, this.scene);
+                this.playerModel = this.animator.model;
+            }
+            
         });
     }
 
@@ -331,75 +406,21 @@ class OtherEntity{
 
 
 class Animator{
-    constructor(objectPath, scene){
+    constructor(object, scene){
         this.scene = scene;
-        this.objectPath = objectPath;
 
         this.currentAnim = null;
-        this.model = null
+
+        this.model = clone(object)
+
+        this.scene.scene.add(this.model)
+        console.log(this.model)
     }
 
-    loadAnimations(){
-        return new Promise((resolve, reject) => {
-            this.animations = {};
-            try {
-
-            }
-
-            catch (error){
-                console.log(error)
-            }
-
-            this.scene.load.gltf(this.objectPath).then(gltf => {
-                const child = gltf.scene.children[0]
-
-
-                const tempModel = new ExtendedObject3D()
-                tempModel.add(child)
-                this.scene.scene.add(tempModel)
-
-
-
-                tempModel.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true
-                        child.material.metalness = 0
-                    }
-
-
-                });
-
-                this.scene.animationMixers.add(tempModel.animation.mixer)
-
-                const animNames = [];
-                gltf.animations.forEach(animation => {
-                    if (animation.name) {
-                      // add a new animation to the box man
-                      tempModel.animation.add(animation.name, animation)
-                      animNames.push(animation.name)
-                    }
-                })
-
-                tempModel.animation.mixer.timeScale = 0.1
-
-
-                tempModel.scale.set(1.5, 1.5, 1.5)
-
-
-                this.model = tempModel;
-
-
-                tempModel.animation.play(animNames[0])
-
-                resolve(animNames);
-            }).catch(error => {
-                reject(error);
-            });
-        });
-    }
 
     play(name){
         this.model.animation.play(name)
+        console.log(this.model.animation)
     }
 
 }
