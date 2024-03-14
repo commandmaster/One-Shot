@@ -488,10 +488,10 @@ class Animator{
 
     update(){
         if (this.rifle) {
-            this.rifle.lookAt(this.bones['mixamorigLeftHand'].position);
+            const lookAtPos = {x: this.bones['mixamorigLeftHand'].position.x, y: this.bones['mixamorigLeftHand'].position.y, z: this.bones['mixamorigLeftHand'].position.z}
+
+            this.rifle.lookAt(new THREE.Vector3(lookAtPos.x, -lookAtPos.y, lookAtPos.z));
             
-
-
         }
 
     }
