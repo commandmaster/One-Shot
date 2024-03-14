@@ -138,7 +138,7 @@ class MainScene extends Scene3D {
         resize()
 
         // enable physics debug
-        //this.physics.debug.enable()
+        this.physics.debug.enable()
 
         // position camera
         this.camera.position.set(10, 10, 20)
@@ -152,8 +152,13 @@ class MainScene extends Scene3D {
         this.physics.add.existing(ground, { mass: 0, collisionFlags: 2 })
         ground.position.set(0, 0, 0)
 
-        this.loadAnimatedGLTF('/gameAssets/PlayerWithAnims.glb').then((model) => {
+        this.preloadGLTF('/gameAssets/PlayerWithAnims.glb').then((model) => {
             this.playerModel = model;
+        });
+
+
+        this.preloadGLTF('/gameAssets/xen_slr_rifle.glb').then((model) => {
+            this.rifleModel = model;
         });
         
 
@@ -174,7 +179,7 @@ class MainScene extends Scene3D {
         
     }
 
-    loadAnimatedGLTF(path){
+    preloadGLTF(path){
         return new Promise((resolve, reject) => {
             this.animations = {};
             try {
@@ -212,6 +217,7 @@ class MainScene extends Scene3D {
                     if (animation.name) {
                       // add a new animation to the box man
                       tempModel.animation.add(animation.name, animation)
+                      animNames.push(animation.name)
                       
                     }
                 })
@@ -226,7 +232,7 @@ class MainScene extends Scene3D {
                 
                 
 
-                resolve(tempModel);
+                resolve({tempModel, gltf});
             }).catch(error => {
                 reject(error);
             });
@@ -347,6 +353,10 @@ class PlayerClient{
 
             this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
             this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
+
+            if (this.animator){
+                this.animator.update()
+            }
         }
     }
 }
@@ -411,16 +421,79 @@ class Animator{
 
         this.currentAnim = null;
 
-        this.model = clone(object)
+        this.model = clone(object.tempModel)
 
         this.scene.scene.add(this.model)
-        console.log(this.model)
+        
+        this.scene.animationMixers.add(this.model.animation.mixer)
+
+        const animNames = [];
+        object.gltf.animations.forEach(animation => {
+            if (animation.name) {
+                // add a new animation to the box man
+                this.model.animation.add(animation.name, animation)
+                animNames.push(animation.name)
+                
+            }
+        })
+
+        const bones = {};
+        this.model.traverse((child) => {
+            if (child.isBone) {
+                bones[child.name] = child
+            }
+        });
+
+        // const testShape = new THREE.Mesh(new THREE.SphereGeometry(5, 10, 10), new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+        // this.scene.scene.add(testShape)
+        waitForCondition(() => {return this.scene.rifleModel}).then(() => {
+            const rifle = clone(this.scene.rifleModel.tempModel)
+
+            rifle.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true
+                    child.material.metalness = 0
+                }
+
+            });
+            this.scene.scene.add(rifle)
+
+            bones['mixamorigRightHand'].add(rifle)
+
+            rifle.scale.set(0.4, 0.4, 0.4)
+            rifle.position.set(0.2, -0.2, 0.2)
+
+            rifle.lookAt(bones['mixamorigLeftHand'].position)
+
+            this.bones = bones;
+            this.rifle = rifle
+        });
+        
+
+        this.model.animation.mixer.timeScale = 1
+
+
+        this.model.scale.set(1.5, 1.5, 1.5)
+
+
+        this.model.animation.play('Idle')
+        
     }
 
 
     play(name){
         this.model.animation.play(name)
         console.log(this.model.animation)
+    }
+
+    update(){
+        if (this.rifle) {
+            this.rifle.lookAt(this.bones['mixamorigLeftHand'].position);
+            
+
+
+        }
+
     }
 
 }
