@@ -342,6 +342,14 @@ class Animator{
     loadAnimations(){
         return new Promise((resolve, reject) => {
             this.animations = {};
+            try {
+
+            }
+
+            catch (error){
+                console.log(error)
+            }
+
             this.scene.load.gltf(this.objectPath).then(gltf => {
                 const child = gltf.scene.children[0]
 
