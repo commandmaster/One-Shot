@@ -631,10 +631,11 @@ class PlayerAnimator{
             this.scene.scene.add(rifle)
 
             this.scene.player.cameraObject.attach(rifle)
+            const cameraObject = this.scene.player.cameraObject
 
-            rifle.rotation.x = Math.PI + 0.2
-            rifle.rotation.z = -Math.PI/2
-            
+            // rifle.rotation.x = Math.PI + 0.2
+            // rifle.rotation.z = -Math.PI/2
+            rifle.position.set(cameraObject.position.x, cameraObject.position.y, cameraObject.position.z)
 
             rifle.scale.set(0.004, 0.004, 0.004)
             
