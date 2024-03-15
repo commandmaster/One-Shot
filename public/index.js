@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from '/jsm/controls/OrbitControls.js'
 import { clone } from '/jsm/utils/SkeletonUtils.js';
 
-import { FPSCamera } from '/firstPersonContoller.js';
+import { FPSContoller } from '/firstPersonContoller.js';
 
 
 
@@ -42,7 +42,7 @@ class MainScene extends Scene3D {
 
         this.socket.on('createPlayer', (packet) => {
             this.player = new PlayerClient(this.socket, this, packet)
-            this.fpsCamera = new FPSCamera(this.camera, this.player)
+
         });
 
         socket.on("updateEntities", (packet) => {
@@ -196,12 +196,17 @@ class MainScene extends Scene3D {
                 animState = this.player.animator.currentAnim
             }
 
-            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState})
+            const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.player.rb.quaternion)
+            const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.player.rb.quaternion)
+            const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.player.rb.quaternion)
+            const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.rb.quaternion)
+
+            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState, orientation: {forward:{x:forward.x, y:forward.y, z:forward.z}, back: {x:back.x, y:back.y, z:back.z}, left: {x:left.x, y:left.y, z:left.z}, right: {x:right.x, y:right.y, z:right.z}}});
             
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
 
-            this.player.update()
+            this.player.update(t)
         }
 
         if (this.fpsCamera) this.fpsCamera.update(t - this.lastUpdateTime);
@@ -302,6 +307,9 @@ class PlayerClient{
 
         this.scene.physics.add.existing(group)
         this.rb = group;
+
+        this.cameraObject = new THREE.Object3D()
+        this.scene.scene.add(this.cameraObject);
         
        
         //this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
@@ -344,7 +352,11 @@ class PlayerClient{
         waitForCondition(() => {return this.scene.playerModel}).then(() => {
             if (!this.animator){
                 this.animator = new Animator(this.scene.playerModel, this.scene);
-                this.playerModel = this.animator.model;
+
+                waitForCondition(() => {return this.animator.doneLoading}).then(() => {
+                    this.FPSContoller = new FPSContoller(this, this.scene, this.scene.camera);
+                    this.playerModel = this.animator.model;
+                });
             }
         });
     }
@@ -379,10 +391,13 @@ class PlayerClient{
         
     }
 
-    update(){
+    update(t){
+        this.cameraObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
+        this.cameraObject.rotation.set(this.rb.rotation.x, this.rb.rotation.y, this.rb.rotation.z)
         if (this.playerModel){
             const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
             const animRotOffset = {x: 0, y: Math.PI, z: 0}
+
             //this.scene.camera.position.set(this.rb.position.x, this.rb.position.y + 2, this.rb.position.z)
 
 
@@ -392,6 +407,10 @@ class PlayerClient{
 
             if (this.animator){
                 this.animator.update()
+            }
+
+            if (this.FPSContoller){
+                this.FPSContoller.update(t)
             }
         }
     }
@@ -455,6 +474,7 @@ class OtherEntity{
 class Animator{
     constructor(object, scene){
         this.scene = scene;
+        this.doneLoading = false;
 
         this.currentAnim = 'Idle';
 
@@ -522,6 +542,7 @@ class Animator{
 
         this.model.animation.play('Idle')
         
+        this.doneLoading = true;
     }
 
 

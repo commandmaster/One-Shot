@@ -77,12 +77,15 @@ class BackendPlayer {
         this.scene = scene
         this.currentAnimState = 'Idle'
         this.queuedPacket = {}
+        this.orientation = {}
 
         this.socket.on('clientPacket', (packet) => {
           const inputs = packet.inputs;
           const frameID = packet.frameID;
           const socketID = this.socket.id;
           this.currentAnimState = packet.animState;
+          this.orientation = packet.orientation;
+
 
           this.queuedPacket = {inputs, frameID, socketID};
         });
@@ -116,6 +119,8 @@ class BackendPlayer {
 
     applyMovements(){
       for (const input in this.queuedPacket.inputs){
+        
+
         let speed = 1.5;
         const maxSpeed = 5;
         const turnMultiplier = 2.5;
