@@ -201,7 +201,7 @@ class MainScene extends Scene3D {
             const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.player.rb.quaternion)
             const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.rb.quaternion)
 
-            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState, orientation: {forward:{x:forward.x, y:forward.y, z:forward.z}, back: {x:back.x, y:back.y, z:back.z}, left: {x:left.x, y:left.y, z:left.z}, right: {x:right.x, y:right.y, z:right.z}}});
+            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState, orientation: {forward:{x:forward.x, y:forward.y, z:forward.z}, back: {x:back.x, y:back.y, z:back.z}, left: {x:left.x, y:left.y, z:left.z}, right: {x:right.x, y:right.y, z:right.z}}, rot: {x: this.player.rb.rotation.x, y: this.player.rb.rotation.y, z: this.player.rb.rotation.z, w: this.player.rb.rotation.w}});
             
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
@@ -292,7 +292,7 @@ class PlayerClient{
         this.socket = socket;
         this.scene = scene;
         this.id = initPacket.id;
-        
+        this.enityType = "player"
 
         this.init(initPacket);
     }
@@ -351,7 +351,7 @@ class PlayerClient{
 
         waitForCondition(() => {return this.scene.playerModel}).then(() => {
             if (!this.animator){
-                this.animator = new Animator(this.scene.playerModel, this.scene);
+                this.animator = new PlayerAnimator(this.scene.playerModel, this.scene);
 
                 waitForCondition(() => {return this.animator.doneLoading}).then(() => {
                     this.FPSContoller = new FPSContoller(this, this.scene, this.scene.camera);
@@ -367,26 +367,25 @@ class PlayerClient{
         const turnMultiplier = 2.5;
 
         const vel = this.rb.body.velocity
+
+
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.rb.quaternion)
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.rb.quaternion)
+        const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.rb.quaternion)
+        const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.rb.quaternion)
+
         
         if (inputs.up === true && vel.z > -maxSpeed){
-            if (vel.z > 0) speed *= turnMultiplier;
-
-            this.rb.body.applyForce(0, 0, -speed);
+            this.rb.body.setVelocity(forward.x * speed, forward.y, forward.z * speed)
         }
         if (inputs.down === true && vel.z < maxSpeed){
-            if (vel.z < 0) speed *= turnMultiplier;
-
-            this.rb.body.applyForce(0, 0, speed);
+            this.rb.body.setVelocity(back.x * speed, back.y, back.z * speed)
         }
         if (inputs.left === true && vel.x > -maxSpeed){
-            if (vel.x > 0) speed *= turnMultiplier;
-
-            this.rb.body.applyForce(-speed, 0, 0);
+            this.rb.body.setVelocity(left.x * speed, left.y, left.z * speed)
         }
         if (inputs.right === true && vel.x < maxSpeed){
-            if (vel.x < 0) speed *= turnMultiplier;
-
-            this.rb.body.applyForce(speed, 0, 0);
+            this.rb.body.setVelocity(right.x * speed, right.y, right.z * speed)
         }
         
     }
@@ -421,6 +420,8 @@ class OtherEntity{
         this.scene = scene;
         this.init()
 
+        this.enityType = "entity"
+
 
         let group = new THREE.Group()
         const body = this.scene.add.box({ height: 2.3, width: 0.75, depth: 0.5 })
@@ -445,7 +446,7 @@ class OtherEntity{
     init(){
         waitForCondition(() => {return this.scene.playerModel}).then(() => {
             if (!this.animator){
-                this.animator = new Animator(this.scene.playerModel, this.scene);
+                this.animator = new EntityAnimator(this.scene.playerModel, this.scene);
                 this.playerModel = this.animator.model;
             }
             
@@ -471,7 +472,7 @@ class OtherEntity{
 
 
 
-class Animator{
+class EntityAnimator{
     constructor(object, scene){
         this.scene = scene;
         this.doneLoading = false;
@@ -579,6 +580,123 @@ class Animator{
     }
 
 }
+
+
+
+
+
+class PlayerAnimator{
+    constructor(object, scene){
+        this.scene = scene;
+        this.doneLoading = false;
+
+        this.currentAnim = 'Idle';
+
+        this.model = clone(object.tempModel)
+
+        this.scene.scene.add(this.model)
+        
+        this.scene.animationMixers.add(this.model.animation.mixer)
+
+        const animNames = [];
+        object.gltf.animations.forEach(animation => {
+            if (animation.name) {
+                // add a new animation to the box man
+                this.model.animation.add(animation.name, animation)
+                animNames.push(animation.name)
+                
+            }
+        })
+
+        const bones = {};
+        this.model.traverse((child) => {
+            if (child.isBone) {
+                bones[child.name] = child
+            }
+        });
+
+        // const testShape = new THREE.Mesh(new THREE.SphereGeometry(5, 10, 10), new THREE.MeshBasicMaterial({ color: 0x00ff00 }))
+        // this.scene.scene.add(testShape)
+        waitForCondition(() => {return this.scene.rifleModel}).then(() => {
+            const rifle = clone(this.scene.rifleModel.tempModel)
+
+            rifle.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true
+                    child.material.metalness = 0
+                    child.frustumCulled = false
+                }
+
+            });
+            this.scene.scene.add(rifle)
+
+            this.scene.player.cameraObject.attach(rifle)
+
+            rifle.rotation.x = Math.PI + 0.2
+            rifle.rotation.z = -Math.PI/2
+            
+
+            rifle.scale.set(0.004, 0.004, 0.004)
+            
+            //rifle.position.set(0, 25, 2)
+
+
+
+            this.bones = bones;
+            this.rifle = rifle
+        });
+        
+
+        this.model.animation.mixer.timeScale = 1
+
+
+        this.model.scale.set(1.5, 1.5, 1.5)
+
+
+        this.model.animation.play('Idle')
+        
+        this.doneLoading = true;
+
+        this.model.visible = false;
+    }
+
+
+    play(name){
+        this.model.animation.play(name)
+        this.currentAnim = name;
+    }
+
+    update(){
+        if (this.scene.currentInputs.up === true){
+            if (this.currentAnim !== 'rifleRunning') this.play('rifleRunning');
+        }
+
+
+        else if (this.scene.currentInputs.down === true){
+            if (this.currentAnim !== 'backwards') this.play('backwards');
+        }
+
+            
+        else if (this.scene.currentInputs.left === true){
+            if (this.currentAnim !== 'strafeLeft') this.play('strafeLeft');
+        }
+
+        
+        else if (this.scene.currentInputs.right === true){
+            if (this.currentAnim !== 'strafeRight') this.play('strafeRight');
+        }
+
+        else {
+            if (this.currentAnim !== 'Idle') this.play('Idle');
+        }
+            
+ 
+    }
+
+}
+
+
+
 
 
 

@@ -59,6 +59,9 @@ export class FPSContoller{
         tempEuler.y = 0;
         this.playerCam.quaternion.setFromEuler(tempEuler);
 
+
+        
+
         this.lastX = this.currentX;
         this.lastY = this.currentY;
     }

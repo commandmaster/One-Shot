@@ -79,16 +79,6 @@ class BackendPlayer {
         this.queuedPacket = {}
         this.orientation = {}
 
-        this.socket.on('clientPacket', (packet) => {
-          const inputs = packet.inputs;
-          const frameID = packet.frameID;
-          const socketID = this.socket.id;
-          this.currentAnimState = packet.animState;
-          this.orientation = packet.orientation;
-
-
-          this.queuedPacket = {inputs, frameID, socketID};
-        });
 
         this.init()
     }
@@ -115,33 +105,47 @@ class BackendPlayer {
         this.scene.objects.push(this.rb)
 
         this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}})
-    }
+
+
+        this.socket.on('clientPacket', (packet) => {
+          const inputs = packet.inputs;
+          const frameID = packet.frameID;
+          const socketID = this.socket.id;
+          this.currentAnimState = packet.animState;
+          this.orientation = packet.orientation
+          
+          this.rb.body.setRotation(packet.rot.x, packet.rot.y, packet.rot.z, packet.rot.w);
+          
+
+          this.queuedPacket = {inputs, frameID, socketID, animState: this.currentAnimState, orientation: this.orientation};
+        });
+      }
 
     applyMovements(){
       for (const input in this.queuedPacket.inputs){
         
 
         let speed = 1.5;
-        const maxSpeed = 5;
-        const turnMultiplier = 2.5;
+        
 
         const vel = this.rb.body.velocity;
+        const forward = this.queuedPacket.orientation.forward;
+        const right = this.queuedPacket.orientation.right;
+        const left = this.queuedPacket.orientation.left;
+        const back = this.queuedPacket.orientation.back;
+        
 
-        if (input === 'up' && this.queuedPacket.inputs[input] === true && vel.z > -maxSpeed){
-          if (vel.z > 0) speed *= turnMultiplier;
-          this.rb.body.applyForce(0, 0, -speed)
+        if (input === 'up' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.setVelocity(forward.x * speed, forward.y, forward.z * speed)
         }
-        if (input === 'down' && this.queuedPacket.inputs[input] === true && vel.z < maxSpeed){
-          if (vel.z < 0) speed *= turnMultiplier;
-          this.rb.body.applyForce(0, 0, speed)
+        if (input === 'down' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.setVelocity(back.x * speed, back.y, back.z * speed)
         }
-        if (input === 'left' && this.queuedPacket.inputs[input] === true && vel.x > -maxSpeed){
-          if (vel.x > 0) speed *= turnMultiplier;
-          this.rb.body.applyForce(-speed, 0, 0)
+        if (input === 'left' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.setVelocity(left.x * speed, left.y, left.z * speed)
         }
-        if (input === 'right' && this.queuedPacket.inputs[input] === true && vel.x < maxSpeed){
-          if (vel.x < 0) speed *= turnMultiplier;
-          this.rb.body.applyForce(speed, 0, 0)
+        if (input === 'right' && this.queuedPacket.inputs[input] === true){
+          this.rb.body.setVelocity(right.x * speed, right.y, right.z * speed)
         }
       }
     }
