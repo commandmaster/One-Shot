@@ -362,9 +362,8 @@ class PlayerClient{
     }
 
     applyMovements(inputs){
-        let speed = 1.5;
-        const maxSpeed = 5;
-        const turnMultiplier = 2.5;
+        let speed = 5;
+
 
         const vel = this.rb.body.velocity
 
@@ -375,16 +374,16 @@ class PlayerClient{
         const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.rb.quaternion)
 
         
-        if (inputs.up === true && vel.z > -maxSpeed){
+        if (inputs.up === true){
             this.rb.body.setVelocity(forward.x * speed, forward.y, forward.z * speed)
         }
-        if (inputs.down === true && vel.z < maxSpeed){
+        if (inputs.down === true){
             this.rb.body.setVelocity(back.x * speed, back.y, back.z * speed)
         }
-        if (inputs.left === true && vel.x > -maxSpeed){
+        if (inputs.left === true){
             this.rb.body.setVelocity(left.x * speed, left.y, left.z * speed)
         }
-        if (inputs.right === true && vel.x < maxSpeed){
+        if (inputs.right === true){
             this.rb.body.setVelocity(right.x * speed, right.y, right.z * speed)
         }
         
@@ -392,7 +391,7 @@ class PlayerClient{
 
     update(t){
         this.cameraObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
-        this.cameraObject.rotation.set(this.rb.rotation.x, this.rb.rotation.y, this.rb.rotation.z)
+        this.cameraObject.y = this.rb.position.y;
         if (this.playerModel){
             const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
             const animRotOffset = {x: 0, y: Math.PI, z: 0}
@@ -401,8 +400,8 @@ class PlayerClient{
 
 
 
-            this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
-            this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
+            //this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
+            //this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
 
             if (this.animator){
                 this.animator.update()
@@ -555,6 +554,7 @@ class EntityAnimator{
     update(){
         if (this.scene.currentInputs.up === true){
             if (this.currentAnim !== 'rifleRunning') this.play('rifleRunning');
+            
         }
 
 
@@ -574,6 +574,7 @@ class EntityAnimator{
 
         else {
             if (this.currentAnim !== 'Idle') this.play('Idle');
+            
         }
             
  
@@ -630,17 +631,27 @@ class PlayerAnimator{
             });
             this.scene.scene.add(rifle)
 
-            this.scene.player.cameraObject.attach(rifle)
             const cameraObject = this.scene.player.cameraObject
 
-            // rifle.rotation.x = Math.PI + 0.2
-            // rifle.rotation.z = -Math.PI/2
-            rifle.position.set(cameraObject.position.x, cameraObject.position.y, cameraObject.position.z)
+            this.model.rotation.y = Math.PI
 
-            rifle.scale.set(0.004, 0.004, 0.004)
+ 
+
+   
             
-            //rifle.position.set(0, 25, 2)
+            bones['mixamorigRightHand'].add(rifle)
 
+            rifle.rotation.x = Math.PI + 0.2
+            rifle.rotation.z = -Math.PI/2
+            
+
+            rifle.scale.set(0.4, 0.4, 0.4)
+            
+            rifle.position.set(0, 25, 2)
+
+
+
+            cameraObject.attach(this.model)
 
 
             this.bones = bones;
@@ -658,38 +669,44 @@ class PlayerAnimator{
         
         this.doneLoading = true;
 
-        this.model.visible = false;
+        //this.model.visible = false;
     }
 
 
     play(name){
         this.model.animation.play(name)
-        this.currentAnim = name;
+
     }
 
     update(){
         if (this.scene.currentInputs.up === true){
-            if (this.currentAnim !== 'rifleRunning') this.play('rifleRunning');
+            this.currentAnim = 'rifleRunning';
         }
 
 
         else if (this.scene.currentInputs.down === true){
-            if (this.currentAnim !== 'backwards') this.play('backwards');
+            this.currentAnim = 'backwards';
         }
 
             
         else if (this.scene.currentInputs.left === true){
-            if (this.currentAnim !== 'strafeLeft') this.play('strafeLeft');
+            this.currentAnim = 'strafeLeft';
         }
 
         
         else if (this.scene.currentInputs.right === true){
-            if (this.currentAnim !== 'strafeRight') this.play('strafeRight');
+            this.currentAnim = 'strafeRight';
         }
 
-        else {
-            if (this.currentAnim !== 'Idle') this.play('Idle');
+        
+        if (this.currentAnim !== 'Idle') {
+            this.play('Idle');
+            this.currentAnim = 'Idle';
         }
+        const blendSpeed = 0.01;
+        if (this.scene.player.FPSContoller.playerCam.position.z > -0.37) this.scene.player.FPSContoller.playerCam.position.z -= blendSpeed;
+
+        
             
  
     }

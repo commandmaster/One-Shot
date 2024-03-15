@@ -125,7 +125,7 @@ class BackendPlayer {
       for (const input in this.queuedPacket.inputs){
         
 
-        let speed = 1.5;
+        let speed = 5;
         
 
         const vel = this.rb.body.velocity;
@@ -134,7 +134,7 @@ class BackendPlayer {
         const left = this.queuedPacket.orientation.left;
         const back = this.queuedPacket.orientation.back;
         
-
+        
         if (input === 'up' && this.queuedPacket.inputs[input] === true){
           this.rb.body.setVelocity(forward.x * speed, forward.y, forward.z * speed)
         }

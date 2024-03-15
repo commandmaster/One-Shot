@@ -13,7 +13,7 @@ export class FPSContoller{
         this.scene.scene.add(cameraHelper);
 
         const headPos = this.player.animator.model.position;
-        const cameraOffset = new THREE.Vector3(0.2, 2.85, -0.5);
+        const cameraOffset = new THREE.Vector3(0.2, 4.13, -0.32);
 
         cam.rotation.set(0, 0, 0);
         cam.position.set(headPos.x + cameraOffset.x, headPos.y + cameraOffset.y, headPos.z + cameraOffset.z);
@@ -26,7 +26,8 @@ export class FPSContoller{
         this.rotationSpeed = Math.PI / 180;
         
 
-        //this.scene.camera = cam;
+        this.scene.camera = this.playerCam;
+
 
         window.addEventListener('click', () => {
             document.body.requestPointerLock();
@@ -41,6 +42,8 @@ export class FPSContoller{
         window.addEventListener('mousemove', (e) => {
             this.currentX = e.clientX;
             this.currentY = e.clientY;
+            
+            
         }, false);
 
     }
@@ -57,7 +60,9 @@ export class FPSContoller{
 
         const tempEuler = this.euler.clone();
         tempEuler.y = 0;
-        this.playerCam.quaternion.setFromEuler(tempEuler);
+
+        this.player.cameraObject.rotation.set(this.euler.x, this.euler.y, this.euler.z, 'YXZ');
+
 
 
         
