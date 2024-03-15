@@ -3,7 +3,10 @@ const { Project, Scene3D, AmmoPhysics, PhysicsLoader, ExtendedObject3D} = ENABLE
 import * as THREE from 'three'
 import { OrbitControls } from '/jsm/controls/OrbitControls.js'
 import { clone } from '/jsm/utils/SkeletonUtils.js';
-//import { FBXLoader } from './jsm/loaders/FBXLoader.js'
+
+import { FPSCamera } from '/firstPersonContoller.js';
+
+
 
 function waitForCondition(condition) {
     return new Promise((resolve) => {
@@ -24,6 +27,7 @@ class MainScene extends Scene3D {
     init() {
         console.log('init')
         this.entities = {}
+        this.lastUpdateTime = 0;
 
         this.renderer.setPixelRatio(1)
         this.renderer.setSize(window.innerWidth, window.innerHeight)
@@ -38,6 +42,7 @@ class MainScene extends Scene3D {
 
         this.socket.on('createPlayer', (packet) => {
             this.player = new PlayerClient(this.socket, this, packet)
+            this.fpsCamera = new FPSCamera(this.camera, this.player)
         });
 
         socket.on("updateEntities", (packet) => {
@@ -45,6 +50,12 @@ class MainScene extends Scene3D {
                 if (id !== this.player.id){
                     if (this.entities[id]){
                         this.entities[id].update(packet.entities[id])
+
+                        const entityAnimator = this.entities[id].animator
+                        
+                        if (entityAnimator){
+                            if (packet.entities[id].animState !== entityAnimator.currentAnim) entityAnimator.play(packet.entities[id].animState);
+                        }
                     }
 
                     if (!this.entities[id]){
@@ -84,7 +95,8 @@ class MainScene extends Scene3D {
             up: false,
             down: false,
             left: false,
-            right: false
+            right: false,
+            shoot: false
         }
 
         window.addEventListener('keydown', (e) => {
@@ -92,14 +104,23 @@ class MainScene extends Scene3D {
             if (e.key === 's') this.currentInputs.down = true
             if (e.key === 'a') this.currentInputs.left = true
             if (e.key === 'd') this.currentInputs.right = true
-        })
+
+        });
 
         window.addEventListener('keyup', (e) => {
             if (e.key === 'w') this.currentInputs.up = false
             if (e.key === 's') this.currentInputs.down = false
             if (e.key === 'a') this.currentInputs.left = false
             if (e.key === 'd') this.currentInputs.right = false
-        })
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            this.currentInputs.shoot = true
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            this.currentInputs.shoot = false
+        });
 
         
     }
@@ -142,6 +163,7 @@ class MainScene extends Scene3D {
 
         // position camera
         this.camera.position.set(10, 10, 20)
+        
 
         const groundGeometry = new THREE.BoxGeometry(40, 1, 40)
         const groundMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff })
@@ -152,7 +174,7 @@ class MainScene extends Scene3D {
         this.physics.add.existing(ground, { mass: 0, collisionFlags: 2 })
         ground.position.set(0, 0, 0)
 
-        this.preloadGLTF('/gameAssets/PlayerWithAnims.glb').then((model) => {
+        this.preloadGLTF('/gameAssets/fullAlien.glb').then((model) => {
             this.playerModel = model;
         });
 
@@ -165,10 +187,16 @@ class MainScene extends Scene3D {
         
     }
 
-    update() {
+    update(t) {
         if (this.player){
             this.player.applyMovements(this.currentInputs)
-            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID })
+
+            let animState = 'Idle'
+            if (this.player.animator){
+                animState = this.player.animator.currentAnim
+            }
+
+            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState})
             
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
@@ -176,7 +204,9 @@ class MainScene extends Scene3D {
             this.player.update()
         }
 
-        
+        if (this.fpsCamera) this.fpsCamera.update(t - this.lastUpdateTime);
+
+        this.lastUpdateTime = t;
     }
 
     preloadGLTF(path){
@@ -205,6 +235,7 @@ class MainScene extends Scene3D {
                     if (child.isMesh) {
                         child.castShadow = true
                         child.material.metalness = 0
+                        child.frustumCulled = false
                     }
 
 
@@ -292,7 +323,10 @@ class PlayerClient{
     
         this.socket.on('resolveState', (packet) => {
             this.rb.position.set(packet.pos.x, packet.pos.y, packet.pos.z)
-            this.rb.rotation.set(packet.rot.x, packet.rot.y, packet.rot.z, packet.rot.w)
+            //this.rb.rotation.set(packet.rot.x, packet.rot.y, packet.rot.z, packet.rot.w)
+            this.rb.rotation.x = packet.rot.x
+            this.rb.rotation.z = packet.rot.z
+
             this.rb.body.setVelocity(packet.linearVel.x, packet.linearVel.y, packet.linearVel.z,)
             this.rb.body.setAngularVelocity(packet.angularVel.x, packet.angularVel.y, packet.angularVel.z, packet.angularVel.w)
             this.rb.body.needUpdate = true;
@@ -351,6 +385,8 @@ class PlayerClient{
             const animRotOffset = {x: 0, y: Math.PI, z: 0}
             //this.scene.camera.position.set(this.rb.position.x, this.rb.position.y + 2, this.rb.position.z)
 
+
+
             this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
             this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
 
@@ -406,6 +442,7 @@ class OtherEntity{
         const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
         const animRotOffset = {x: 0, y: Math.PI, z: 0}
 
+        
         if (this.playerModel){
             this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
             this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
@@ -419,7 +456,7 @@ class Animator{
     constructor(object, scene){
         this.scene = scene;
 
-        this.currentAnim = null;
+        this.currentAnim = 'Idle';
 
         this.model = clone(object.tempModel)
 
@@ -453,17 +490,24 @@ class Animator{
                 if (child.isMesh) {
                     child.castShadow = true
                     child.material.metalness = 0
+                    child.frustumCulled = false
                 }
 
             });
             this.scene.scene.add(rifle)
 
+            rifle.lookAt(new THREE.Vector3(0, 0, 0))
             bones['mixamorigRightHand'].add(rifle)
 
-            rifle.scale.set(0.4, 0.4, 0.4)
-            rifle.position.set(0.2, -0.2, 0.2)
+            rifle.rotation.x = Math.PI + 0.2
+            rifle.rotation.z = -Math.PI/2
+            
 
-            rifle.lookAt(bones['mixamorigLeftHand'].position)
+            rifle.scale.set(0.4, 0.4, 0.4)
+            
+            rifle.position.set(0, 25, 2)
+
+
 
             this.bones = bones;
             this.rifle = rifle
@@ -483,33 +527,37 @@ class Animator{
 
     play(name){
         this.model.animation.play(name)
-        console.log(this.model.animation)
+        this.currentAnim = name;
     }
 
     update(){
-        if (this.rifle) {
-            const lookAtPos = {x: this.bones['mixamorigLeftHand'].position.x, y: this.bones['mixamorigLeftHand'].position.y, z: this.bones['mixamorigLeftHand'].position.z}
-
-            this.rifle.lookAt(new THREE.Vector3(lookAtPos.x, -lookAtPos.y, lookAtPos.z));
-            
+        if (this.scene.currentInputs.up === true){
+            if (this.currentAnim !== 'rifleRunning') this.play('rifleRunning');
         }
 
+
+        else if (this.scene.currentInputs.down === true){
+            if (this.currentAnim !== 'backwards') this.play('backwards');
+        }
+
+            
+        else if (this.scene.currentInputs.left === true){
+            if (this.currentAnim !== 'strafeLeft') this.play('strafeLeft');
+        }
+
+        
+        else if (this.scene.currentInputs.right === true){
+            if (this.currentAnim !== 'strafeRight') this.play('strafeRight');
+        }
+
+        else {
+            if (this.currentAnim !== 'Idle') this.play('Idle');
+        }
+            
+ 
     }
 
 }
 
-class PlayerStateMachine{
-    constructor(player){
-        this.player = player;
 
-        this.animator = player.animator;
-        this.currentState = null;
-    }
-
-    update(){
-        console.log(this.player.rb.velocity)
-    }
-
-
-}
 

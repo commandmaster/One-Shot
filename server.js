@@ -58,7 +58,13 @@ class EntitiesPacket{
     constructor(players){
         this.entities = {}
         for (const id in players){
-            this.entities[id] = {pos: {x: players[id].rb.position.x, y: players[id].rb.position.y, z: players[id].rb.position.z}, rot: {x: players[id].rb.rotation.x, y: players[id].rb.rotation.y, z: players[id].rb.rotation.z, w: players[id].rb.rotation.w}}
+            this.entities[id] = 
+            {
+              pos: {x: players[id].rb.position.x, y: players[id].rb.position.y, z: players[id].rb.position.z}, 
+              rot: {x: players[id].rb.rotation.x, y: players[id].rb.rotation.y, z: players[id].rb.rotation.z, w: players[id].rb.rotation.w}, 
+              velocity: {x: players[id].rb.body.velocity.x, y: players[id].rb.body.velocity.y, z: players[id].rb.body.velocity.z},
+              animState: players[id].currentAnimState
+            }
         }
     }
 }
@@ -69,12 +75,15 @@ class BackendPlayer {
         this.networkManager = networkManager;
         this.socket = socket
         this.scene = scene
+        this.currentAnimState = 'Idle'
         this.queuedPacket = {}
 
         this.socket.on('clientPacket', (packet) => {
           const inputs = packet.inputs;
           const frameID = packet.frameID;
           const socketID = this.socket.id;
+          this.currentAnimState = packet.animState;
+
           this.queuedPacket = {inputs, frameID, socketID};
         });
 
