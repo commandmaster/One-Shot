@@ -468,7 +468,7 @@ class OtherEntity{
         const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
         group.add(body, head)
         group.position.set(entityObject.pos.x, entityObject.pos.y, entityObject.pos.z)
-        group.customTeamTag = 'red'
+
 
         this.scene.physics.add.existing(group)
 

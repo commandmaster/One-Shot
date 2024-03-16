@@ -139,7 +139,7 @@ class BackendPlayer {
 
 
           
-          this.queuedPacket = {inputs, frameID, socketID, animState: this.currentAnimState, orientation: this.orientation};
+          this.queuedPacket = {inputs, frameID, socketID, animState: this.currentAnimState, orientation: this.orientation, rot: this.rot, team: this.team, weaponPos: packet.weaponPos};
         });
       }
 
@@ -174,6 +174,42 @@ class BackendPlayer {
 
     sendState(socketToResolve, statePacket){
       socketToResolve.emit('resolveState', statePacket)
+    }
+
+    update(delta) {
+      // this is very similar to the client side raycasting code but doesn't work with amoo physcis
+      // To  get his working I would need to implement the correct ammo js raycasting code instead of the cleint side enable.io code
+      
+
+      // for (const input in this.queuedPacket.inputs){
+      //   if (input === "shoot" && this.queuedPacket.inputs[input]){
+      //     const weaponPos = this.queuedPacket.weaponPos
+      //     const cameraQuat = new Ammo.btQuaternion().setEulerZYX(this.rot.y, this.rot.x, this.rot.z)
+
+      //     const raycaster = this.scene.physics.add.raycaster('allHits')
+          
+      //     raycaster.setRayFromWorld(weaponPos.x, weaponPos.y, weaponPos.z)
+
+      //     const direction = new Ammo.btVector3(0, 0, -1).rotate(cameraQuat)
+      //     raycaster.setRayToWorld(weaponPos.x + direction.x * 100, weaponPos.y + direction.y * 100, weaponPos.z + direction.z * 100)
+      //     raycaster.rayTest()
+
+      //     if (raycaster.hasHit()) {
+      //         raycaster.getCollisionObjects().forEach((obj, i) => {
+      //           const { x, y, z } = raycaster.getHitPointsWorld()[i]
+
+      //           console.log('allHits: ', `${obj}:`, `x:${x.toFixed(2)}`, `y:${y.toFixed(2)}`, `z:${z.toFixed(2)}`)
+
+      //           if (obj.customTeamTag === 'red'){
+      //             console.log('hit red player!')
+      //           }
+      //         })
+      //     }
+
+      //     raycaster.destroy()
+      //   }
+      // }
+
     }
 }
 
@@ -226,7 +262,8 @@ class ServerScene {
     const players = this.networkManager.players
     for (const playerID in players){
       players[playerID].applyMovements();
-      
+      players[playerID].update(delta)
+
       players[playerID].rb.body.transform()
       players[playerID].rb.body.ammo.setAngularFactor(new Ammo.btVector3(0, 0, 0))
 
