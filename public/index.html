@@ -12,15 +12,20 @@
     <script type="importmap">
       {
           "imports": {
-              "three": "./build/three.module.js"
+              "three": "./build/three.module.js",
+              "three-nebula": "./nebulaBuild/three-nebula.js"
           }
       }
     </script>
 
+    
+
+
+
     <script src="/lib/enable3d/enable3d.framework.0.22.0-dev.1.min.js"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js" integrity="sha384-Gr6Lu2Ajx28mzwyVR8CFkULdCU7kMlZ9UthllibdOSo6qAiN+yXNHqtgdTvFXMT4" crossorigin="anonymous"></script>
-
     
+    <script src="https://cdn.jsdelivr.net/npm/three-nebula@10.0.3/build/three-nebula.min.js"></script>
 
   </head>
 
@@ -35,6 +40,7 @@
     <script type="module" src="firstPersonContoller.js"></script>
     <script type="module" src="packets.js"></script>
     <script src="world.js"></script>
+
     <script type="module" src="index.js"></script>
   </body>
 </html>

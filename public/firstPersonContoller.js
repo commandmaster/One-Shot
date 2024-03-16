@@ -26,7 +26,7 @@ export class FPSContoller{
         this.rotationSpeed = Math.PI / 180 * 0.1;
         
 
-        this.scene.camera = this.playerCam;
+        //this.scene.camera = this.playerCam;
 
 
         window.addEventListener('click', () => {

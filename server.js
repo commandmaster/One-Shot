@@ -8,6 +8,7 @@ const path = require('path')
 app.use(express.static('public'))
 app.use('/build/', express.static(path.join(__dirname, 'node_modules/three/build')))
 app.use('/jsm/', express.static(path.join(__dirname, 'node_modules/three/examples/jsm')))
+app.use('/nebulaBuild/', express.static(path.join(__dirname, 'node_modules/three-nebula/build')))
 
 const server = app.listen(3000)
 
@@ -179,7 +180,7 @@ class BackendPlayer {
     update(delta) {
       // this is very similar to the client side raycasting code but doesn't work with amoo physcis
       // To  get his working I would need to implement the correct ammo js raycasting code instead of the cleint side enable.io code
-      
+
 
       // for (const input in this.queuedPacket.inputs){
       //   if (input === "shoot" && this.queuedPacket.inputs[input]){

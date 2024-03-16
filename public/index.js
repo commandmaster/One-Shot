@@ -6,6 +6,9 @@ import { clone } from '/jsm/utils/SkeletonUtils.js';
 
 import { FPSContoller } from '/firstPersonContoller.js';
 
+const { System, Emitter, Rate, Span, SpriteRenderer} = window.Nebula;
+import json from './particleSystems/blueBullet.json' assert { type: 'json' };
+
 
 
 
@@ -26,6 +29,7 @@ class MainScene extends Scene3D {
     }
 
     init() {
+        
         console.log('init')
         this.entities = {}
         this.lastUpdateTime = 0;
@@ -174,22 +178,29 @@ class MainScene extends Scene3D {
         this.physics.add.existing(ground, { mass: 0, collisionFlags: 2 })
         ground.position.set(0, 0, 0)
 
-        this.preloadGLTF('/gameAssets/fullAlien.glb').then((model) => {
+        this.preloadGLTF('/gameAssets/3dModels/fullAlien.glb').then((model) => {
             this.playerModel = model;
         });
 
 
-        this.preloadGLTF('/gameAssets/xen_slr_rifle.glb').then((model) => {
+        this.preloadGLTF('/gameAssets/3dModels/alienGun.glb').then((model) => {
             this.rifleModel = model;
         });
         
 
+
+ 
         
     }
 
     update(t) {
+        if (this.nebula) this.nebula.update();
+
+
         if (this.player){
             this.player.applyMovements(this.currentInputs)
+
+
 
             let animState = 'Idle'
             if (this.player.animator){
@@ -334,6 +345,17 @@ class PlayerClient{
         
 
 
+        
+
+        this.nebulaObject = new THREE.Group()
+        System.fromJSONAsync(json.particleSystemState, THREE).then((system) => {
+            console.log(system)
+            const nebulaRenderer = new SpriteRenderer(this.nebulaObject, THREE)
+            
+            this.nebula = system.addRenderer(nebulaRenderer)
+            this.nebulaObject.scale.set(0.1, 0.1, 0.1)
+            this.scene.scene.add(this.nebulaObject)
+        });
 
 
         this.rb.body.setFriction(1.2)
@@ -407,6 +429,9 @@ class PlayerClient{
     }
 
     update(t){
+        this.nebulaObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
+        if (this.nebula) this.nebula.update();
+
         this.cameraObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
         this.cameraObject.y = this.rb.position.y;
         if (this.playerModel){
@@ -645,6 +670,8 @@ class PlayerAnimator{
         this.scene.scene.add(this.model)
         
         this.scene.animationMixers.add(this.model.animation.mixer)
+
+        
 
         const animNames = [];
         object.gltf.animations.forEach(animation => {
