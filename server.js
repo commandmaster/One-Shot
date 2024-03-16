@@ -24,15 +24,33 @@ class NetworkManager {
 
         this.serverScene = new ServerScene(this)
         this.players = {}
+
+        this.redTeam = []
+        this.blueTeam = []
     }
 
     onConnection(socket) {
         console.log('new connection', socket.id)
-        this.players[socket.id] = new BackendPlayer(this, socket, this.serverScene)                                                           
+
+        if (this.redTeam.length <= this.blueTeam.length){
+            this.redTeam.push(socket.id)
+        } else {
+            this.blueTeam.push(socket.id)
+        }
+
+        this.players[socket.id] = new BackendPlayer(this, socket, this.serverScene, this.redTeam.length <= this.blueTeam.length ? 'red' : 'blue')                                                           
     }
 
     onDisconnection(socket) {
         console.log('disconnection', socket.id)
+
+        if (this.redTeam.includes(socket.id)){
+            this.redTeam.splice(this.redTeam.indexOf(socket.id), 1)
+        }
+
+        if (this.blueTeam.includes(socket.id)){
+            this.blueTeam.splice(this.blueTeam.indexOf(socket.id), 1)
+        }
         this.serverScene.physics.destroy(this.players[socket.id].rb)
         io.emit('deleteEntity', {id: socket.id})
         delete this.players[socket.id]
@@ -58,12 +76,14 @@ class EntitiesPacket{
     constructor(players){
         this.entities = {}
         for (const id in players){
-            this.entities[id] = 
-            {
+            players[id].rb.body.transform()
+
+            this.entities[id] = {
               pos: {x: players[id].rb.position.x, y: players[id].rb.position.y, z: players[id].rb.position.z}, 
-              rot: {x: players[id].rb.rotation.x, y: players[id].rb.rotation.y, z: players[id].rb.rotation.z, w: players[id].rb.rotation.w}, 
+              rot: {x: players[id].rot.x, y: players[id].rot.y, z: players[id].rot.z}, 
               velocity: {x: players[id].rb.body.velocity.x, y: players[id].rb.body.velocity.y, z: players[id].rb.body.velocity.z},
-              animState: players[id].currentAnimState
+              animState: players[id].currentAnimState,
+              team: players[id].team
             }
         }
     }
@@ -71,14 +91,15 @@ class EntitiesPacket{
 
 
 class BackendPlayer {
-    constructor(networkManager, socket, scene) {
+    constructor(networkManager, socket, scene, team) {
         this.networkManager = networkManager;
         this.socket = socket
         this.scene = scene
         this.currentAnimState = 'Idle'
         this.queuedPacket = {}
         this.orientation = {}
-
+        this.rot = {x: 0, y: 0, z: 0};
+        this.team = team
 
         this.init()
     }
@@ -104,7 +125,7 @@ class BackendPlayer {
         this.rb.body.setFriction(1.2)
         this.scene.objects.push(this.rb)
 
-        this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}})
+        this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}, team: this.team})
 
 
         this.socket.on('clientPacket', (packet) => {
@@ -113,10 +134,11 @@ class BackendPlayer {
           const socketID = this.socket.id;
           this.currentAnimState = packet.animState;
           this.orientation = packet.orientation
-          
-          this.rb.body.setRotation(packet.rot.x, packet.rot.y, packet.rot.z, packet.rot.w);
+          this.rot = packet.rot;
           
 
+
+          
           this.queuedPacket = {inputs, frameID, socketID, animState: this.currentAnimState, orientation: this.orientation};
         });
       }

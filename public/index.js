@@ -8,6 +8,7 @@ import { FPSContoller } from '/firstPersonContoller.js';
 
 
 
+
 function waitForCondition(condition) {
     return new Promise((resolve) => {
       const intervalId = setInterval(() => {
@@ -42,7 +43,6 @@ class MainScene extends Scene3D {
 
         this.socket.on('createPlayer', (packet) => {
             this.player = new PlayerClient(this.socket, this, packet)
-
         });
 
         socket.on("updateEntities", (packet) => {
@@ -201,7 +201,26 @@ class MainScene extends Scene3D {
             const left = new THREE.Vector3(-1, 0, 0).applyQuaternion(this.player.rb.quaternion)
             const back = new THREE.Vector3(0, 0, 1).applyQuaternion(this.player.rb.quaternion)
 
-            this.socket.emit("clientPacket", { inputs: this.currentInputs, frameID: this.frameID, animState, orientation: {forward:{x:forward.x, y:forward.y, z:forward.z}, back: {x:back.x, y:back.y, z:back.z}, left: {x:left.x, y:left.y, z:left.z}, right: {x:right.x, y:right.y, z:right.z}}, rot: {x: this.player.rb.rotation.x, y: this.player.rb.rotation.y, z: this.player.rb.rotation.z, w: this.player.rb.rotation.w}});
+            let weaponPos = {x: 0, y: 0, z: 0}
+            if (this.player.animator){
+                if (this.player.animator.rifle) weaponPos = this.player.animator.rifle.getWorldPosition(new THREE.Vector3(0, 0, 0))
+            }
+            
+ 
+            this.socket.emit("clientPacket", { 
+                inputs: this.currentInputs, 
+                frameID: this.frameID, 
+                animState, 
+                orientation: {
+                    forward:{x:forward.x, y:forward.y, z:forward.z}, 
+                    back: {x:back.x, y:back.y, z:back.z}, 
+                    left: {x:left.x, y:left.y, z:left.z}, 
+                    right: {x:right.x, y:right.y, z:right.z}
+                },
+                rot: {x: this.player.cameraObject.rotation.x, y: this.player.cameraObject.rotation.y, z: this.player.cameraObject.rotation.z},
+                weaponPos,
+
+            });
             
             this.sentPacketBuffer[this.frameID] = {inputs: this.currentInputs, frameID: this.frameID, state: { pos: this.player.rb.position, rot: this.player.rb.rotation, linearVel: this.player.rb.body.velocity, angularVel: this.player.rb.body.angularVelocity}}
             this.frameID++;
@@ -293,6 +312,7 @@ class PlayerClient{
         this.scene = scene;
         this.id = initPacket.id;
         this.enityType = "player"
+        this.team = initPacket.team;
 
         this.init(initPacket);
     }
@@ -304,6 +324,7 @@ class PlayerClient{
         const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
         group.add(body, head)
         group.position.set(initPacket.pos.x, initPacket.pos.y, initPacket.pos.z)
+        group.customTeamTag = this.team;
 
         this.scene.physics.add.existing(group)
         this.rb = group;
@@ -311,8 +332,7 @@ class PlayerClient{
         this.cameraObject = new THREE.Object3D()
         this.scene.scene.add(this.cameraObject);
         
-       
-        //this.rb = this.scene.physics.add.box({ x: initPacket.pos.x, y: initPacket.pos.y, z: initPacket.pos.z }, { lambert: { color: 'hotpink' }});
+
 
 
 
@@ -325,18 +345,15 @@ class PlayerClient{
         this.rb.body.setRotation(initPacket.rot.x, initPacket.rot.y, initPacket.rot.z)
         this.rb.body.needUpdate = true;
 
-        console.log(this.rb.body.ammo.getWorldTransform().getOrigin().x(), this.rb.body.ammo.getWorldTransform().getOrigin().y(), this.rb.body.ammo.getWorldTransform().getOrigin().z())
+
 
 
     
         this.socket.on('resolveState', (packet) => {
             this.rb.position.set(packet.pos.x, packet.pos.y, packet.pos.z)
-            //this.rb.rotation.set(packet.rot.x, packet.rot.y, packet.rot.z, packet.rot.w)
-            this.rb.rotation.x = packet.rot.x
-            this.rb.rotation.z = packet.rot.z
 
             this.rb.body.setVelocity(packet.linearVel.x, packet.linearVel.y, packet.linearVel.z,)
-            this.rb.body.setAngularVelocity(packet.angularVel.x, packet.angularVel.y, packet.angularVel.z, packet.angularVel.w)
+            
             this.rb.body.needUpdate = true;
 
             this.rb.body.once.update(() => {
@@ -410,6 +427,30 @@ class PlayerClient{
             if (this.FPSContoller){
                 this.FPSContoller.update(t)
             }
+
+            if (this.scene.currentInputs.shoot === true){
+                const raycaster = this.scene.physics.add.raycaster('allHits')
+                const weaponPos = this.animator.rifle.getWorldPosition(new THREE.Vector3(0, 0, 0))
+                raycaster.setRayFromWorld(weaponPos.x, weaponPos.y, weaponPos.z)
+
+                const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(this.cameraObject.quaternion)
+                raycaster.setRayToWorld(weaponPos.x + direction.x * 100, weaponPos.y + direction.y * 100, weaponPos.z + direction.z * 100)
+                raycaster.rayTest()
+
+                if (raycaster.hasHit()) {
+                    raycaster.getCollisionObjects().forEach((obj, i) => {
+                      const { x, y, z } = raycaster.getHitPointsWorld()[i]
+
+                      console.log('allHits: ', `${obj}:`, `x:${x.toFixed(2)}`, `y:${y.toFixed(2)}`, `z:${z.toFixed(2)}`)
+
+                      if (obj.customTeamTag === 'red'){
+                        console.log('hit red player!')
+                      }
+                    })
+                }
+
+                raycaster.destroy()
+            }
         }
     }
 }
@@ -427,12 +468,14 @@ class OtherEntity{
         const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
         group.add(body, head)
         group.position.set(entityObject.pos.x, entityObject.pos.y, entityObject.pos.z)
+        group.customTeamTag = 'red'
 
         this.scene.physics.add.existing(group)
 
         this.rb = group;
         this.rb.body.setCollisionFlags(2)
-        this.rb.rotation.set(entityObject.rot.x, entityObject.rot.y, entityObject.rot.z)
+        
+        this.rb.rotation.set(0, entityObject.rot.y, 0)
         this.rb.body.needUpdate = true;
 
         this.rb.body.once.update(() => {
@@ -453,9 +496,13 @@ class OtherEntity{
     }
 
     update(entityObject){
+
         this.rb.body.setCollisionFlags(2)
         this.rb.position.set(entityObject.pos.x, entityObject.pos.y, entityObject.pos.z)
-        this.rb.rotation.set(entityObject.rot.x, entityObject.rot.y, entityObject.rot.z)
+        this.rb.rotation.set(0, entityObject.rot.y, 0)
+
+        this.rb.customTeamTag = entityObject.team;
+
         this.rb.body.needUpdate = true;
 
         const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
@@ -464,7 +511,7 @@ class OtherEntity{
         
         if (this.playerModel){
             this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
-            this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
+            this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z)
         }
     }
 }
@@ -633,7 +680,7 @@ class PlayerAnimator{
 
             const cameraObject = this.scene.player.cameraObject
 
-            this.model.rotation.y = Math.PI
+            this.model.rotation.y = Math.PI - 0.2
 
  
 
@@ -641,7 +688,7 @@ class PlayerAnimator{
             
             bones['mixamorigRightHand'].add(rifle)
 
-            rifle.rotation.x = Math.PI + 0.2
+            rifle.rotation.x = Math.PI + 0.3
             rifle.rotation.z = -Math.PI/2
             
 
@@ -666,6 +713,7 @@ class PlayerAnimator{
 
 
         this.model.animation.play('Idle')
+        this.play('Idle')
         
         this.doneLoading = true;
 
@@ -675,7 +723,7 @@ class PlayerAnimator{
 
     play(name){
         this.model.animation.play(name)
-
+        this.playing = name;
     }
 
     update(){
@@ -698,15 +746,19 @@ class PlayerAnimator{
             this.currentAnim = 'strafeRight';
         }
 
-        
-        if (this.currentAnim !== 'Idle') {
-            this.play('Idle');
+        else {
             this.currentAnim = 'Idle';
         }
-        const blendSpeed = 0.01;
-        if (this.scene.player.FPSContoller.playerCam.position.z > -0.37) this.scene.player.FPSContoller.playerCam.position.z -= blendSpeed;
 
         
+        if (this.playing !== 'Idle') {
+            this.play('Idle');
+        }
+
+        
+
+        
+        console.log(this.currentAnim)
             
  
     }

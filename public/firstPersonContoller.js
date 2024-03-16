@@ -13,7 +13,7 @@ export class FPSContoller{
         this.scene.scene.add(cameraHelper);
 
         const headPos = this.player.animator.model.position;
-        const cameraOffset = new THREE.Vector3(0.2, 4.13, -0.32);
+        const cameraOffset = new THREE.Vector3(0.2, 4.13, -0.37);
 
         cam.rotation.set(0, 0, 0);
         cam.position.set(headPos.x + cameraOffset.x, headPos.y + cameraOffset.y, headPos.z + cameraOffset.z);
@@ -23,7 +23,7 @@ export class FPSContoller{
         this.player.cameraObject.attach(cam);
         
         this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        this.rotationSpeed = Math.PI / 180;
+        this.rotationSpeed = Math.PI / 180 * 0.1;
         
 
         this.scene.camera = this.playerCam;
@@ -34,14 +34,17 @@ export class FPSContoller{
         }, false);
         
 
-        this.lastX = 0;
-        this.lastY = 0;
 
-        this.currentX = 0;
-        this.currentY = 0;
+ 
+        this.movementX = 0;
+        this.movementY = 0;
+
         window.addEventListener('mousemove', (e) => {
             this.currentX = e.clientX;
             this.currentY = e.clientY;
+
+            this.movementX = e.movementX;
+            this.movementY = e.movementY;
             
             
         }, false);
@@ -49,11 +52,9 @@ export class FPSContoller{
     }
 
     update(timeElapsed){
-        const movementX = this.currentX - this.lastX;
-        const movementY = this.currentY - this.lastY;
 
-        this.euler.y -= movementX * this.rotationSpeed;
-        this.euler.x -= movementY * this.rotationSpeed;
+        this.euler.y -= this.movementX * this.rotationSpeed;
+        this.euler.x -= this.movementY * this.rotationSpeed;
         this.euler.x = Math.min(Math.max(this.euler.x, -1.0472), 1.0472);
 
         this.player.rb.rotation.set(0, this.euler.y, 0, 'YXZ');
@@ -67,8 +68,9 @@ export class FPSContoller{
 
         
 
-        this.lastX = this.currentX;
-        this.lastY = this.currentY;
+
+        this.movementX = 0;
+        this.movementY = 0;
     }
 
 }
