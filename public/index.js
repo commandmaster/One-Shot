@@ -1,5 +1,7 @@
 const { Project, Scene3D, AmmoPhysics, PhysicsLoader, ExtendedObject3D} = ENABLE3D
 
+const { GUI } = dat
+
 import * as THREE from 'three'
 import { OrbitControls } from '/jsm/controls/OrbitControls.js'
 import { clone } from '/jsm/utils/SkeletonUtils.js';
@@ -29,7 +31,9 @@ class MainScene extends Scene3D {
     }
 
     init() {
-        
+        this.gui = new GUI()
+
+
         console.log('init')
         this.entities = {}
         this.lastUpdateTime = 0;
@@ -142,12 +146,12 @@ class MainScene extends Scene3D {
 
 
 
-        var dirLight = new THREE.DirectionalLight( 0xffffff );
-        dirLight.position.set( 75, 300, -75 );
-        dirLight.castShadow = true;
-        this.scene.add( dirLight );
+        // var dirLight = new THREE.DirectionalLight( 0xffffff );
+        // dirLight.position.set( 75, 300, -75 );
+        // dirLight.castShadow = true;
+        // this.scene.add( dirLight );
 
-        this.warpSpeed('orbitControls', 'sky', 'fog', 'lookAtCenter', 'camera')
+        this.warpSpeed('fog', 'lookAtCenter', 'camera')
 
 
         const resize = () => {
@@ -164,6 +168,10 @@ class MainScene extends Scene3D {
 
         // enable physics debug
         this.physics.debug.enable()
+        console.log(this.physics.debug)
+        
+        
+
 
         // position camera
         this.camera.position.set(10, 10, 20)
@@ -188,13 +196,11 @@ class MainScene extends Scene3D {
         });
         
 
-
- 
-        
+        this.effectManager = new EffectManager(this);
     }
 
     update(t) {
-        if (this.nebula) this.nebula.update();
+        this.effectManager.update();
 
 
         if (this.player){
@@ -325,6 +331,9 @@ class PlayerClient{
         this.enityType = "player"
         this.team = initPacket.team;
 
+        this.shotTimer = 0;
+        this.lastShotTime = Date.now();
+
         this.init(initPacket);
     }
 
@@ -347,16 +356,7 @@ class PlayerClient{
 
         
 
-        this.nebulaObject = new THREE.Group()
-        System.fromJSONAsync(json.particleSystemState, THREE).then((system) => {
-            console.log(system)
-            const nebulaRenderer = new SpriteRenderer(this.nebulaObject, THREE)
-            
-            this.nebula = system.addRenderer(nebulaRenderer)
-            this.nebulaObject.scale.set(0.1, 0.1, 0.1)
-            this.scene.scene.add(this.nebulaObject)
-        });
-
+        
 
         this.rb.body.setFriction(1.2)
 
@@ -429,8 +429,8 @@ class PlayerClient{
     }
 
     update(t){
-        this.nebulaObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
-        if (this.nebula) this.nebula.update();
+        const timeSinceLastShot = Date.now() - this.lastShotTime;
+
 
         this.cameraObject.position.set(this.rb.position.x, this.rb.position.y, this.rb.position.z)
         this.cameraObject.y = this.rb.position.y;
@@ -438,12 +438,6 @@ class PlayerClient{
             const animPosOffset = new THREE.Vector3(0, -1.15, 0.1)
             const animRotOffset = {x: 0, y: Math.PI, z: 0}
 
-            //this.scene.camera.position.set(this.rb.position.x, this.rb.position.y + 2, this.rb.position.z)
-
-
-
-            //this.playerModel.position.set(this.rb.position.x + animPosOffset.x, this.rb.position.y + animPosOffset.y, this.rb.position.z + animPosOffset.z)
-            //this.playerModel.rotation.set(this.rb.rotation.x + animRotOffset.x, this.rb.rotation.y + animRotOffset.y, this.rb.rotation.z + + animRotOffset.z, this.rb.rotation.w)
 
             if (this.animator){
                 this.animator.update()
@@ -453,7 +447,10 @@ class PlayerClient{
                 this.FPSContoller.update(t)
             }
 
-            if (this.scene.currentInputs.shoot === true){
+            if (this.scene.currentInputs.shoot === true && timeSinceLastShot > 500 && this.shotTimer > 500){
+                this.lastShotTime = Date.now();
+
+
                 const raycaster = this.scene.physics.add.raycaster('allHits')
                 const weaponPos = this.animator.rifle.getWorldPosition(new THREE.Vector3(0, 0, 0))
                 raycaster.setRayFromWorld(weaponPos.x, weaponPos.y, weaponPos.z)
@@ -475,6 +472,12 @@ class PlayerClient{
                 }
 
                 raycaster.destroy()
+
+                const pos = this.animator.rifleBarrel.getWorldPosition(new THREE.Vector3(0, 0, 0))
+
+
+                const effect = new BulletEffect(this.scene, pos, new THREE.Vector3(0, 0, 1).applyQuaternion(this.cameraObject.quaternion), json.particleSystemState)
+                this.scene.effectManager.addEffect(effect)
             }
         }
     }
@@ -578,12 +581,16 @@ class EntityAnimator{
         waitForCondition(() => {return this.scene.rifleModel}).then(() => {
             const rifle = clone(this.scene.rifleModel.tempModel)
 
+            const rifleBones = {};
             rifle.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true
                     child.material.metalness = 0
                     child.frustumCulled = false
                 }
+
+                if (child.isBone) rifleBones[child.name] = child
+
 
             });
             this.scene.scene.add(rifle)
@@ -600,7 +607,7 @@ class EntityAnimator{
             rifle.position.set(0, 25, 2)
 
 
-
+            this.rifleBones = rifleBones;
             this.bones = bones;
             this.rifle = rifle
         });
@@ -701,8 +708,11 @@ class PlayerAnimator{
                     child.material.metalness = 0
                     child.frustumCulled = false
                 }
-
             });
+
+
+
+            
             this.scene.scene.add(rifle)
 
             const cameraObject = this.scene.player.cameraObject
@@ -729,7 +739,26 @@ class PlayerAnimator{
 
 
             this.bones = bones;
-            this.rifle = rifle
+            this.rifle = rifle;
+
+
+            this.rifleBarrel = new THREE.Group()
+            this.rifleBarrel.position.set(5.3, 62, 12.4)
+            this.rifleBarrel.rotation.x = Math.PI + 0.3
+            this.rifleBarrel.rotation.z = -Math.PI/2
+
+            // this.scene.gui.add(this.rifleBarrel.position, 'x').min(-10).max(100).step(0.1).name('rifleBarrelX')
+            // this.scene.gui.add(this.rifleBarrel.position, 'y').min(-10).max(100).step(0.1).name('rifleBarrelY')
+            // this.scene.gui.add(this.rifleBarrel.position, 'z').min(-10).max(100).step(0.1).name('rifleBarrelZ')
+
+
+            bones['mixamorigRightHand'].add(this.rifleBarrel)
+
+
+            
+
+
+
         });
         
 
@@ -795,5 +824,65 @@ class PlayerAnimator{
 
 
 
+class BulletEffect{
+    constructor(scene, position, direction, json){
+        this.scene = scene;
+        this.position = position;
+        this.direction = direction;
+        this.json = json;
 
+        this.init();
+    }
+
+    init(){
+        this.nebulaObject = new THREE.Group()
+        this.nebulaObject.position.set(this.position.x, this.position.y, this.position.z)
+        this.nebulaObject.lookAt(this.position.x + this.direction.x, this.position.y + this.direction.y, this.position.z + this.direction.z)
+        
+    
+        System.fromJSONAsync(json.particleSystemState, THREE).then((system) => {
+            const nebulaRenderer = new SpriteRenderer(this.nebulaObject, THREE)
+
+            this.nebulaSystem = system;
+            
+            this.nebula = system.addRenderer(nebulaRenderer)
+            this.nebulaObject.scale.set(0.05, 0.05, 0.05)
+            this.scene.scene.add(this.nebulaObject)
+
+            setTimeout(() => {
+                this.scene.scene.remove(this.nebulaObject)
+                this.nebula.destroy()
+            }, 300)
+        });
+
+
+
+        
+    }
+
+    update(){
+        if (this.nebula){
+            this.nebula.update();
+            
+        } 
+
+    }
+}
+
+class EffectManager{
+    constructor(scene){
+        this.scene = scene;
+        this.effects = [];
+    }
+
+    addEffect(effect){
+        this.effects.push(effect)
+    }
+
+    update(){
+        this.effects.forEach(effect => {
+            effect.update()
+        })
+    }
+}
 

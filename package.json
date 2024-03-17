@@ -16,6 +16,7 @@
   "dependencies": {
     "@enable3d/ammo-on-nodejs": "^0.25.4",
     "@enable3d/ammo-physics": "^0.25.4",
+    "dat.gui": "^0.7.9",
     "express": "^4.18.3",
     "nodemon": "^3.1.0",
     "socket.io": "^4.7.4",
