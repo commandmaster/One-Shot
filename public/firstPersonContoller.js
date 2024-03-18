@@ -64,9 +64,11 @@ export class FPSContoller{
     }
 
     update(timeElapsed){
+        const rotSpeed = this.rotationSpeed * 2560 / window.innerWidth;
 
-        this.euler.y -= this.movementX * this.rotationSpeed;
-        this.euler.x -= this.movementY * this.rotationSpeed;
+
+        this.euler.y -= this.movementX * rotSpeed;
+        this.euler.x -= this.movementY * rotSpeed;
         this.euler.x = Math.min(Math.max(this.euler.x, -1.0472), 1.0472);
 
         this.player.rb.rotation.set(0, this.euler.y, 0, 'YXZ');

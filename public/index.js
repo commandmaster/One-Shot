@@ -10,6 +10,7 @@ import { FPSContoller } from '/firstPersonContoller.js';
 
 const { System, Emitter, Rate, Span, SpriteRenderer} = window.Nebula;
 import json from './particleSystems/blueBullet.json' assert { type: 'json' };
+import practiceRange from './practiceRange/practiceRange.json' assert { type: 'json' };
 
 
 
@@ -184,6 +185,14 @@ class MainScene extends Scene3D {
 
         this.scene.add(ground)
         this.physics.add.existing(ground, { mass: 0, collisionFlags: 2 })
+
+
+        // spawn in the world from json
+        const jsonLoader = new LoadJsonToClient(this, (practiceRange))
+        jsonLoader.loadLevel()
+
+
+
         ground.position.set(0, 0, 0)
 
         this.preloadGLTF('/gameAssets/3dModels/fullAlien.glb').then((model) => {
@@ -921,3 +930,42 @@ class Weapon{
     
 }
 
+
+
+
+
+
+class LoadJsonToClient{
+    constructor(clientScene, jsonObject){
+        this.clientScene = clientScene;
+        this.json = jsonObject;
+    }
+
+    loadLevel(){
+        for (const object of this.json.sceneObjects){
+            if (object.type === "gltf"){
+                this.clientScene.load.gltf(object.path, (gltf) => {
+                    gltf.scene.position.set(object.x, object.y, object.z);
+                    gltf.scene.rotation.set(object.rotationX, object.rotationY, object.rotationZ);
+                    gltf.scene.scale.set(object.scaleX, object.scaleY, object.scaleZ);
+                    this.clientScene.add.existing(gltf.scene);
+                });
+            }
+
+            if (object.type === "cube" || object.type === "box"){
+                const tempBox = new THREE.Mesh(
+                    new THREE.BoxGeometry(object.width, object.height, object.depth),
+                    new THREE.MeshBasicMaterial({color: 0x00ff00})
+                );
+
+                
+
+                tempBox.position.set(object.x, object.y, object.z);
+                tempBox.rotation.set(object.rotationX, object.rotationY, object.rotationZ);
+
+                this.clientScene.scene.add(tempBox);
+                this.clientScene.physics.add.existing(tempBox, {mass: 0, collisionFlags: 2})
+            }
+        }
+    }
+}
