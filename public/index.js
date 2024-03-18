@@ -299,8 +299,6 @@ class MainScene extends Scene3D {
 
                 tempModel.scale.set(1.5, 1.5, 1.5)
 
-
-                tempModel.animation.play('Idle')
                 
                 
 
@@ -334,6 +332,7 @@ class PlayerClient{
         this.shotTimer = 0;
         this.lastShotTime = Date.now();
 
+
         this.init(initPacket);
     }
 
@@ -352,7 +351,6 @@ class PlayerClient{
         this.cameraObject = new THREE.Object3D()
         this.scene.scene.add(this.cameraObject);
         
-
 
         
 
@@ -447,7 +445,7 @@ class PlayerClient{
                 this.FPSContoller.update(t)
             }
 
-            if (this.scene.currentInputs.shoot === true && timeSinceLastShot > 500 && this.shotTimer > 500){
+            if (this.scene.currentInputs.shoot === true && timeSinceLastShot > 500){
                 this.lastShotTime = Date.now();
 
 
@@ -884,5 +882,42 @@ class EffectManager{
             effect.update()
         })
     }
+}
+
+class Weapon{
+    constructor(player, loadedGltf){
+        this.scene = player.scene;
+        this.player = player;
+        this.model = clone(loadedGltf.tempModel)
+        this.gltf = loadedGltf.gltf;
+
+        this.model.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true
+                child.material.metalness = 0
+                child.frustumCulled = false
+            }
+        });
+
+        this.model.scale.set(100, 100, 100)
+    }
+
+    update(){
+
+    }
+
+    attach(offsetPos, offsetRot){
+        this.player.cameraObject.add(this.model)
+        this.scene.scene.add(this.model)
+        this.model.position.set(offsetPos.x, offsetPos.y + 2, offsetPos.z)
+        this.model.rotation.set(offsetRot.x, offsetRot.y, offsetRot.z)
+    }
+
+    detach(){
+        this.player.cameraObject.remove(this.model)
+        this.scene.scene.remove(this.model)
+    }
+
+    
 }
 
