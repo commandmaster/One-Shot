@@ -351,7 +351,7 @@ class PlayerClient{
         const body = this.scene.add.box({ height: 2.3, width: 0.75, depth: 0.5 })
         const head = this.scene.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 })
         group.add(body, head)
-        group.position.set(initPacket.pos.x, initPacket.pos.y, initPacket.pos.z)
+        group.position.set(0, 5, 0)
         group.customTeamTag = this.team;
 
         this.scene.physics.add.existing(group)
@@ -468,13 +468,20 @@ class PlayerClient{
 
                 if (raycaster.hasHit()) {
                     raycaster.getCollisionObjects().forEach((obj, i) => {
-                      const { x, y, z } = raycaster.getHitPointsWorld()[i]
+                        const { x, y, z } = raycaster.getHitPointsWorld()[i]
 
-                      console.log('allHits: ', `${obj}:`, `x:${x.toFixed(2)}`, `y:${y.toFixed(2)}`, `z:${z.toFixed(2)}`)
 
-                      if (obj.customTeamTag === 'red'){
-                        console.log('hit red player!')
-                      }
+                        if (obj.customTeamTag === 'red'){
+                            if (this.team === 'blue') this.socket.emit('hitPlayer', {id: obj.id})
+                            console.log(this.team)
+                            
+                        }
+
+                        if (obj.customTeamTag === 'blue'){
+                            if (this.team === 'red') this.socket.emit('hitPlayer', {id: obj.id})
+                            console.log(this.team)
+                            
+                        }
                     })
                 }
 

@@ -61,6 +61,8 @@ export class FPSContoller{
 
 
         this.scene.physics.debug.disable()
+
+        this.player.socket.emit('playerFullyLoaded');
     }
 
     update(timeElapsed){

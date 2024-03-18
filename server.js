@@ -39,7 +39,8 @@ class NetworkManager {
             this.blueTeam.push(socket.id)
         }
 
-        this.players[socket.id] = new BackendPlayer(this, socket, this.serverScene, this.redTeam.length <= this.blueTeam.length ? 'red' : 'blue')                                                           
+        this.players[socket.id] = new BackendPlayer(this, socket, this.serverScene, this.redTeam.length <= this.blueTeam.length ? 'red' : 'blue')      
+        
     }
 
     onDisconnection(socket) {
@@ -101,6 +102,7 @@ class BackendPlayer {
         this.orientation = {}
         this.rot = {x: 0, y: 0, z: 0};
         this.team = team
+        this.health = 100
 
         this.init()
     }
@@ -112,7 +114,9 @@ class BackendPlayer {
         const head = this.scene.factory.add.sphere({ radius: 0.3, y: 1.4, z: -0.17 }, { lambert: { color: 0xffff00 } })
 
         tempObj.add(body, head)
-        tempObj.position.set(0, 20, 0)
+        tempObj.position.set(0, 5, 0)
+
+        
 
 
         this.scene.factory.add.existing(tempObj)
@@ -127,7 +131,13 @@ class BackendPlayer {
         this.scene.objects.push(this.rb)
 
         this.socket.emit('createPlayer', {id: this.socket.id, pos: {x: this.rb.position.x, y: this.rb.position.y, z: this.rb.position.z}, rot: {x: this.rb.rotation.x, y: this.rb.rotation.y, z: this.rb.rotation.z, w: this.rb.rotation.w}, team: this.team})
-
+        
+        this.socket.on('playerFullyLoaded', () => {
+          const t = this.rb.body.ammo.getCenterOfMassTransform()
+          t.setOrigin(new Ammo.btVector3(0, 5, 10))
+          this.rb.body.ammo.setCenterOfMassTransform(t)
+          
+        });
 
         this.socket.on('clientPacket', (packet) => {
           const inputs = packet.inputs;
@@ -137,11 +147,13 @@ class BackendPlayer {
           this.orientation = packet.orientation
           this.rot = packet.rot;
           
-
-
-          
           this.queuedPacket = {inputs, frameID, socketID, animState: this.currentAnimState, orientation: this.orientation, rot: this.rot, team: this.team, weaponPos: packet.weaponPos};
         });
+
+        this.socket.on('hitPlayer', (hitPacket) => {
+          console.log('hit player: ', hitPacket.id)
+          
+        })
       }
 
     applyMovements(){
