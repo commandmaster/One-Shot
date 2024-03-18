@@ -58,6 +58,19 @@ class NetworkManager {
         delete this.players[socket.id]
     }
 
+    deletePlayer(id) {
+        if (this.redTeam.includes(id)){
+            this.redTeam.splice(this.redTeam.indexOf(id), 1)
+        }
+
+        if (this.blueTeam.includes(id)){
+            this.blueTeam.splice(this.blueTeam.indexOf(id), 1)
+        }
+
+        this.serverScene.physics.destroy(this.players[id].rb)
+        delete this.players[id]
+    }
+
 }
 
 class StatePacket{
@@ -151,7 +164,13 @@ class BackendPlayer {
         });
 
         this.socket.on('hitPlayer', (hitPacket) => {
-          console.log('hit player: ', hitPacket.id)
+          console.log('hit player: ', hitPacket)
+          // console.log('hit player: ', hitPacket.id)
+          // this.networkManager.players[hitPacket.id].health -= 50;
+
+          // if (this.networkManager.players[hitPacket.id].health <= 0){
+          //   this.networkManager.deletePlayer(hitPacket.id)
+          // }
           
         })
       }
@@ -319,7 +338,6 @@ class LoadJsonToServer{
       this.serverScene = serverScene;
       this.json = jsonObject;
 
-      console.log(this.json)
   }
 
   loadLevel(){

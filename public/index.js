@@ -353,6 +353,7 @@ class PlayerClient{
         group.add(body, head)
         group.position.set(0, 5, 0)
         group.customTeamTag = this.team;
+        group.socketID = this.id;
 
         this.scene.physics.add.existing(group)
         this.rb = group;
@@ -472,13 +473,13 @@ class PlayerClient{
 
 
                         if (obj.customTeamTag === 'red'){
-                            if (this.team === 'blue') this.socket.emit('hitPlayer', {id: obj.id})
+                            if (this.team === 'blue') this.socket.emit('hitPlayer', {id: obj.socketID})
                             console.log(this.team)
                             
                         }
 
                         if (obj.customTeamTag === 'blue'){
-                            if (this.team === 'red') this.socket.emit('hitPlayer', {id: obj.id})
+                            if (this.team === 'red') this.socket.emit('hitPlayer', {id: obj.socketID})
                             console.log(this.team)
                             
                         }
@@ -544,6 +545,7 @@ class OtherEntity{
         this.rb.rotation.set(0, entityObject.rot.y, 0)
 
         this.rb.customTeamTag = entityObject.team;
+        this.rb.socketID = entityObject.id;
 
         this.rb.body.needUpdate = true;
 
