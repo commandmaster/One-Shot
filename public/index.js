@@ -850,7 +850,7 @@ class BulletEffect{
             setTimeout(() => {
                 this.scene.scene.remove(this.nebulaObject)
                 this.nebula.destroy()
-            }, 300)
+            }, 100)
         });
 
 
